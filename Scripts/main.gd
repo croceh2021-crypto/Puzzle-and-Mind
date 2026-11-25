@@ -355,6 +355,24 @@ func _start_spot(level: int) -> void:
     _show_spot(level)
 
 func _spot_stage_data(level: int) -> Dictionary:
+    if level == 1:
+        var file := FileAccess.open("res://Data/spot_stage_01.json", FileAccess.READ)
+        if file:
+            var parsed = JSON.parse_string(file.get_as_text())
+            if typeof(parsed) == TYPE_DICTIONARY:
+                var points: Array[Vector2] = []
+                var radii: Array[float] = []
+                for difference in parsed.get("differences", []):
+                    var center: Array = difference.get("center", [0.5, 0.5])
+                    points.append(Vector2(float(center[0]), float(center[1])))
+                    radii.append(float(difference.get("radius", 0.035)))
+                if points.size() == 7:
+                    return {
+                        "image_a": "res://Art/a_bright_high_detail_photorealistic_mountain_vil.png",
+                        "image_b": "res://Art/PM_stage01_B_local.png",
+                        "points": points,
+                        "radii": radii
+                    }
     var points := [
         Vector2(0.125, 0.310), Vector2(0.3125, 0.310),
         Vector2(0.500, 0.310), Vector2(0.6875, 0.310),
@@ -364,7 +382,8 @@ func _spot_stage_data(level: int) -> Dictionary:
     return {
         "image_a": "res://Art/spot_%d_a.svg" % level,
         "image_b": "res://Art/spot_%d_b.svg" % level,
-        "points": points
+        "points": points,
+        "radii": []
     }
 
 func _show_spot(level: int) -> void:
@@ -377,6 +396,7 @@ func _show_spot(level: int) -> void:
     scene.image_a_path = str(stage_data.image_a)
     scene.image_b_path = str(stage_data.image_b)
     scene.difference_points = stage_data.points
+    scene.difference_radii = stage_data.radii
     scene.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.48, 330.0, 560.0))
     scene.size_flags_vertical = Control.SIZE_EXPAND_FILL
     scene.found.connect(_on_difference_found)
@@ -495,6 +515,7 @@ class PhotoSpotPuzzle:
     var photo_b: Texture2D
     var hit: Array[bool] = []
     var difference_points: Array = []
+    var difference_radii: Array = []
 
     func _ready() -> void:
         photo_a = load(image_a_path) as Texture2D
@@ -552,7 +573,8 @@ class PhotoSpotPuzzle:
                     total += 1
                     continue
                 var target: Vector2 = difference_points[i] * bottom_rect.size
-                if (local * bottom_rect.size).distance_to(target) <= max(18.0, bottom_rect.size.x * 0.035):
+                var radius := float(difference_radii[i]) if i < difference_radii.size() else 0.035
+                if (local * bottom_rect.size).distance_to(target) <= max(16.0, bottom_rect.size.x * radius):
                     hit[i] = true
                     total += 1
             if total > 0:
