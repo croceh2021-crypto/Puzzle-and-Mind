@@ -77,6 +77,25 @@ jobs:
           cp "$HOME/.android/debug.keystore" "${{ runner.temp }}/debug.keystore"
           godot --headless --path . --verbose --export-debug "Android" build/PuzzleAndMind-debug.apk
 
+      - name: Export x86_64 APK for emulator testing
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          godot --headless --path . --verbose --export-debug "Android Emulator" build/PuzzleAndMind-emulator.apk
+          test -s build/PuzzleAndMind-emulator.apk
+          file build/PuzzleAndMind-emulator.apk
+          ls -lh build/PuzzleAndMind-emulator.apk
+
+      - name: Upload emulator-only APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Puzzle-and-Mind-Android-Emulator
+          path: build/PuzzleAndMind-emulator.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Verify APK output
         run: |
           test -s build/PuzzleAndMind-debug.apk
@@ -86,7 +105,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Puzzle-and-Mind-Android-Debug
+          name: Puzzle-and-Mind-Android-Emulator
           path: build/PuzzleAndMind-debug.apk
           if-no-files-found: error
           retention-days: 14
