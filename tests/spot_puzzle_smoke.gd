@@ -12,11 +12,9 @@ func _run_tests() -> void:
 
     var game := packed.instantiate()
     root.add_child(game)
-    await process_frame
 
     for level in [1, 2]:
         game.call("_start_spot", level)
-        await process_frame
 
         var puzzle: Control = null
         for node in game.find_children("*", "Control", true, false):
@@ -30,8 +28,6 @@ func _run_tests() -> void:
             return
 
         puzzle.size = Vector2(620, 500)
-        await process_frame
-
         var photo := puzzle.get("photo") as Texture2D
         if photo == null:
             push_error("Stage %d image did not load." % level)
