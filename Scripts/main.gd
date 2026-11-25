@@ -384,13 +384,13 @@ class PhotoSpotPuzzle:
             var bottom_rect := _photo_rect(1)
             if not bottom_rect.has_point(event.position):
                 return
-            var local := (event.position - bottom_rect.position) / bottom_rect.size
+            var local: Vector2 = (event.position - bottom_rect.position) / bottom_rect.size
             var total := 0
             for i in range(difference_points.size()):
                 if hit[i]:
                     total += 1
                     continue
-                var target := difference_points[i] * bottom_rect.size
+                var target: Vector2 = difference_points[i] * bottom_rect.size
                 if (local * bottom_rect.size).distance_to(target) <= max(22.0, bottom_rect.size.x * 0.055):
                     hit[i] = true
                     total += 1
