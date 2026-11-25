@@ -30,3 +30,7 @@
 
 ## Android debug build
 The repository now includes an Android export preset and a GitHub Actions workflow at `.github/workflows/android-debug.yml`. It attempts to build a signed debug APK using a temporary CI-only debug key and uploads the APK as a 14-day workflow artifact. This is a test build, not a Play Store release. Check the workflow run and its artifact before installing.
+
+
+## اختبار Android Emulator
+تمت إضافة مهمة محاكي Pixel 2 إلى `.github/workflows/android-debug.yml`. بعد بناء APK، تقوم المهمة بتثبيته وتشغيله والتقاط لقطات شاشة أثناء محاولة الانتقال من الشاشة الرئيسية إلى عالم اكتشاف الاختلافات والمرحلة الأولى، مع حفظ سجلات Android. راجع Artifact باسم `Puzzle-and-Mind-Emulator-Test` ونتيجة مهمة المحاكي؛ لا تعتبر الاختبار ناجحاً قبل اكتمال المهمة وفحص الأدلة.
