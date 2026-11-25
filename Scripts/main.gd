@@ -23,13 +23,71 @@ var level_unlocked := {"logic": 1, "spot": 1}
 var save_path := "user://puzzle_mind_save.json"
 var root: Control
 var feedback_label: Label
+var music_enabled := true
+var music_volume := 0.35
+var music_player: AudioStreamPlayer
+var music_playback: AudioStreamGeneratorPlayback
+var music_sample_index := 0
+const MUSIC_RATE := 22050
+const MUSIC_STEP := 0.52
+const MUSIC_MELODY := [523.25, 659.25, 783.99, 659.25, 587.33, 698.46, 880.0, 698.46, 523.25, 659.25, 783.99, 1046.5, 880.0, 783.99, 659.25, 587.33]
 
 func _ready() -> void:
     _load_progress()
+    _setup_music()
     _show_home()
 
+func _setup_music() -> void:
+    music_player = AudioStreamPlayer.new()
+    var generator = AudioStreamGenerator.new()
+    generator.mix_rate = MUSIC_RATE
+    generator.buffer_length = 0.5
+    music_player.stream = generator
+    music_player.volume_db = linear_to_db(maxf(music_volume, 0.001)) if music_enabled else -80.0
+    add_child(music_player)
+    music_player.play()
+    music_playback = music_player.get_stream_playback() as AudioStreamGeneratorPlayback
+    set_process(true)
+
+func _process(_delta: float) -> void:
+    if music_playback == null or not music_enabled:
+        return
+    var frames := music_playback.get_frames_available()
+    if frames <= 0:
+        return
+    var samples := PackedVector2Array()
+    samples.resize(frames)
+    for i in range(frames):
+        var t := float(music_sample_index) / float(MUSIC_RATE)
+        var step_index := int(floor(t / MUSIC_STEP)) % MUSIC_MELODY.size()
+        var phase := fposmod(t, MUSIC_STEP) / MUSIC_STEP
+        var note := MUSIC_MELODY[step_index]
+        var bass := MUSIC_MELODY[(step_index / 4 * 4) % MUSIC_MELODY.size()] * 0.25
+        var attack := minf(phase * 9.0, 1.0)
+        var release := 1.0 - smoothstep(0.68, 1.0, phase)
+        var envelope := attack * release
+        var melody := sin(TAU * note * t) * 0.52 + sin(TAU * note * 2.0 * t) * 0.10
+        var harmony := sin(TAU * bass * t) * 0.20
+        var shimmer := sin(TAU * note * 1.5 * t) * 0.035
+        var sample := (melody + harmony + shimmer) * envelope * 0.13
+        samples[i] = Vector2(sample, sample * 0.985)
+        music_sample_index += 1
+    music_playback.push_buffer(samples)
+
+func _on_music_enabled_changed(enabled: bool) -> void:
+    music_enabled = enabled
+    if is_instance_valid(music_player):
+        music_player.volume_db = linear_to_db(maxf(music_volume, 0.001)) if enabled else -80.0
+    _save_progress()
+
+func _on_music_volume_changed(value: float) -> void:
+    music_volume = clampf(value / 100.0, 0.0, 1.0)
+    if is_instance_valid(music_player) and music_enabled:
+        music_player.volume_db = linear_to_db(maxf(music_volume, 0.001))
+    _save_progress()
+
 func _save_progress() -> void:
-    var data = {"coins": coins, "stars": stars, "logic": level_unlocked.logic, "spot": level_unlocked.spot}
+    var data = {"coins": coins, "stars": stars, "logic": level_unlocked.logic, "spot": level_unlocked.spot, "music_enabled": music_enabled, "music_volume": music_volume}
     var f = FileAccess.open(save_path, FileAccess.WRITE)
     if f:
         f.store_string(JSON.stringify(data))
@@ -46,6 +104,8 @@ func _load_progress() -> void:
         stars = int(parsed.get("stars", 0))
         level_unlocked.logic = int(parsed.get("logic", 1))
         level_unlocked.spot = int(parsed.get("spot", 1))
+        music_enabled = bool(parsed.get("music_enabled", true))
+        music_volume = clampf(float(parsed.get("music_volume", 0.35)), 0.0, 1.0)
 
 func _clear() -> void:
     for child in get_children():
@@ -56,18 +116,27 @@ func _clear() -> void:
     add_child(backdrop)
     root = VBoxContainer.new()
     root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    root.add_theme_constant_override("separation", 14)
+    root.add_theme_constant_override("separation", 8)
     add_child(root)
     var margin = MarginContainer.new()
-    margin.add_theme_constant_override("margin_left", 26)
-    margin.add_theme_constant_override("margin_right", 26)
-    margin.add_theme_constant_override("margin_top", 26)
-    margin.add_theme_constant_override("margin_bottom", 26)
+    var viewport_width := get_viewport_rect().size.x
+    var side_margin := int(clampf(viewport_width * 0.045, 12.0, 28.0))
+    margin.add_theme_constant_override("margin_left", side_margin)
+    margin.add_theme_constant_override("margin_right", side_margin)
+    margin.add_theme_constant_override("margin_top", 12)
+    margin.add_theme_constant_override("margin_bottom", 12)
     margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     root.add_child(margin)
+    var scroll := ScrollContainer.new()
+    scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    margin.add_child(scroll)
     var body = VBoxContainer.new()
-    body.add_theme_constant_override("separation", 16)
-    margin.add_child(body)
+    body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    body.add_theme_constant_override("separation", 12)
+    scroll.add_child(body)
     root = body
 
 func _label(text_value: String, size: int = 24, color: Color = CREAM, centered := true) -> Label:
@@ -75,7 +144,8 @@ func _label(text_value: String, size: int = 24, color: Color = CREAM, centered :
     l.text = text_value
     l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER if centered else HORIZONTAL_ALIGNMENT_RIGHT
     l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-    l.add_theme_font_size_override("font_size", size)
+    var scale_factor := clampf(get_viewport_rect().size.x / 720.0, 0.78, 1.12)
+    l.add_theme_font_size_override("font_size", maxi(14, int(round(float(size) * scale_factor))))
     l.add_theme_color_override("font_color", color)
     l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -84,9 +154,9 @@ func _label(text_value: String, size: int = 24, color: Color = CREAM, centered :
 func _button(text_value: String, callback: Callable, primary := false) -> Button:
     var b = Button.new()
     b.text = text_value
-    b.custom_minimum_size = Vector2(0, 72)
+    b.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.052, 52.0, 68.0))
     b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    b.add_theme_font_size_override("font_size", 24)
+    b.add_theme_font_size_override("font_size", int(clampf(get_viewport_rect().size.x * 0.033, 17.0, 23.0)))
     b.add_theme_color_override("font_color", CREAM)
     var normal = StyleBoxFlat.new()
     normal.bg_color = GOLD if primary else PANEL2
@@ -195,7 +265,7 @@ func _show_levels(world: String, push := true) -> void:
     root.add_child(_label("المراحل المفتوحة: %d" % int(level_unlocked[world]), 18, GOLD))
     root.add_child(_label("المراحل المتاحة حالياً: %d من 25" % available_levels, 15, MUTED))
     var grid = GridContainer.new()
-    grid.columns = 4
+    grid.columns = 5 if get_viewport_rect().size.x >= 850.0 else (4 if get_viewport_rect().size.x >= 560.0 else 3)
     grid.add_theme_constant_override("h_separation", 10)
     grid.add_theme_constant_override("v_separation", 10)
     root.add_child(grid)
@@ -305,7 +375,7 @@ func _show_spot(level: int) -> void:
     scene.image_a_path = str(stage_data.image_a)
     scene.image_b_path = str(stage_data.image_b)
     scene.difference_points = stage_data.points
-    scene.custom_minimum_size = Vector2(0, 500)
+    scene.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.48, 330.0, 560.0))
     scene.size_flags_vertical = Control.SIZE_EXPAND_FILL
     scene.found.connect(_on_difference_found)
     root.add_child(scene)
@@ -385,7 +455,30 @@ func _show_settings() -> void:
     _clear()
     _header("الإعدادات")
     root.add_child(_label("اللغة: العربية", 22))
-    root.add_child(_label("الصوت: سيضاف التحكم به في النسخة التالية", 17, MUTED))
+    root.add_child(_label("الموسيقى الخلفية", 22, GOLD))
+    var music_toggle := CheckButton.new()
+    music_toggle.text = "تشغيل الموسيقى"
+    music_toggle.button_pressed = music_enabled
+    music_toggle.add_theme_font_size_override("font_size", 20)
+    music_toggle.toggled.connect(_on_music_enabled_changed)
+    root.add_child(music_toggle)
+    root.add_child(_label("مستوى الصوت: %d%%" % int(round(music_volume * 100.0)), 18, MUTED))
+    var volume_slider := HSlider.new()
+    volume_slider.min_value = 0
+    volume_slider.max_value = 100
+    volume_slider.step = 1
+    volume_slider.value = music_volume * 100.0
+    volume_slider.custom_minimum_size = Vector2(0, 54)
+    volume_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    volume_slider.value_changed.connect(func(value: float):
+        _on_music_volume_changed(value)
+        var labels = root.find_children("*", "Label", true, false)
+        for item in labels:
+            if item is Label and item.text.begins_with("مستوى الصوت:"):
+                item.text = "مستوى الصوت: %d%%" % int(round(value))
+    )
+    root.add_child(volume_slider)
+    root.add_child(_label("يمكنك إيقاف الموسيقى أو خفضها في أي وقت.", 16, MUTED))
     root.add_child(_label("الصعوبة: تدرج تلقائي مع إمكانية الاختيار", 17, MUTED))
     root.add_child(_button("عودة", _show_home))
 
