@@ -27,3 +27,6 @@
 - صور الاختلافات الواقعية ومحتوى 300 مرحلة لم تُنتج بعد.
 
 راجع `DEVELOPMENT_LOG.md` و`TEST_REPORT_2026-11-25.md` و`DESIGN_DECISIONS.md` لمعرفة القرارات والاختبارات وحدود النموذج.
+
+## Android debug build
+The repository now includes an Android export preset and a GitHub Actions workflow at `.github/workflows/android-debug.yml`. It attempts to build a signed debug APK using a temporary CI-only debug key and uploads the APK as a 14-day workflow artifact. This is a test build, not a Play Store release. Check the workflow run and its artifact before installing.
