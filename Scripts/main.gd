@@ -109,7 +109,8 @@ func _load_progress() -> void:
 
 func _clear() -> void:
     for child in get_children():
-        child.queue_free()
+        if child != music_player:
+            child.queue_free()
     var backdrop = ScreenBackdrop.new()
     backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
