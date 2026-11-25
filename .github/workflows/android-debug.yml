@@ -1,0 +1,83 @@
+name: Godot Android debug APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-debug:
+    name: Build Android debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          yes | sdkmanager --licenses
+
+      - name: Setup Godot 4.4.1 and export templates
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.4.1
+          use-dotnet: false
+          include-templates: true
+
+      - name: Create temporary debug signing key
+        run: |
+          mkdir -p "$HOME/.android"
+          keytool -genkeypair -v             -keystore "$HOME/.android/debug.keystore"             -storepass android -alias androiddebugkey -keypass android             -keyalg RSA -keysize 2048 -validity 10000             -dname "CN=Android Debug,O=Android,C=US"
+
+      - name: Configure Godot Android SDK paths
+        run: |
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-4.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/debug_keystore = "$HOME/.android/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOF
+
+      - name: Import project resources
+        run: godot --headless --editor --path . --quit
+
+      - name: Export Android debug APK
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          mkdir -p build
+          cp "$HOME/.android/debug.keystore" "${{ runner.temp }}/debug.keystore"
+          godot --headless --path . --export-debug "Android" build/PuzzleAndMind-debug.apk
+
+      - name: Verify APK output
+        run: |
+          test -s build/PuzzleAndMind-debug.apk
+          file build/PuzzleAndMind-debug.apk
+          ls -lh build/PuzzleAndMind-debug.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Puzzle-and-Mind-Android-Debug
+          path: build/PuzzleAndMind-debug.apk
+          if-no-files-found: error
+          retention-days: 14
