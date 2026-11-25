@@ -176,7 +176,7 @@ func _show_levels(world: String, push := true) -> void:
     if push: _push("worlds")
     _clear()
     _header("مراحل الألغاز" if world == "logic" else "مراحل الاختلافات")
-    var available_levels: int = _read_puzzles().size() if world == "logic" else 5
+    var available_levels: int = _read_puzzles().size() if world == "logic" else 25
     root.add_child(_label("المراحل المفتوحة: %d" % int(level_unlocked[world]), 18, GOLD))
     root.add_child(_label("المراحل المتاحة حالياً: %d من 25" % available_levels, 15, MUTED))
     var grid = GridContainer.new()
@@ -256,7 +256,7 @@ func _show_hint() -> void:
     _show_message(str(current_puzzle.hint))
 
 func _start_spot(level: int) -> void:
-    if level < 1 or level > 5:
+    if level < 1 or level > 25:
         _show_message("هذه المرحلة غير متاحة حالياً.")
         return
     current_level = level
@@ -264,23 +264,22 @@ func _start_spot(level: int) -> void:
     _show_spot(level)
 
 func _spot_stage_data(level: int) -> Dictionary:
-    var points_by_level := {
-        1: [Vector2(0.854, 0.190), Vector2(0.188, 0.381), Vector2(0.502, 0.695)],
-        2: [Vector2(0.125, 0.190), Vector2(0.365, 0.464), Vector2(0.896, 0.786)],
-        3: [Vector2(0.875, 0.179), Vector2(0.505, 0.298), Vector2(0.323, 0.810)],
-        4: [Vector2(0.823, 0.262), Vector2(0.500, 0.524), Vector2(0.177, 0.440)],
-        5: [Vector2(0.854, 0.179), Vector2(0.348, 0.350), Vector2(0.505, 0.845)]
-    }
+    var points := [
+        Vector2(0.125, 0.310), Vector2(0.3125, 0.310),
+        Vector2(0.500, 0.310), Vector2(0.6875, 0.310),
+        Vector2(0.875, 0.310), Vector2(0.3125, 0.738),
+        Vector2(0.6875, 0.738)
+    ]
     return {
         "image_a": "res://Art/spot_%d_a.svg" % level,
         "image_b": "res://Art/spot_%d_b.svg" % level,
-        "points": points_by_level.get(level, points_by_level[1])
+        "points": points
     }
 
 func _show_spot(level: int) -> void:
     _clear()
     _header("اكتشف الاختلافات")
-    root.add_child(_label("المرحلة %d  •  اكتشف 3 اختلافات" % level, 19, GOLD))
+    root.add_child(_label("المرحلة %d  •  اكتشف 7 اختلافات" % level, 19, GOLD))
     root.add_child(_label("قارن الصورتين واضغط على مواضع الاختلاف في الصورة الثانية", 15, MUTED))
     var stage_data: Dictionary = _spot_stage_data(level)
     var scene = PhotoSpotPuzzle.new()
@@ -291,21 +290,21 @@ func _show_spot(level: int) -> void:
     scene.size_flags_vertical = Control.SIZE_EXPAND_FILL
     scene.found.connect(_on_difference_found)
     root.add_child(scene)
-    feedback_label = _label("الاختلافات: 0 / 3", 20, GOLD)
+    feedback_label = _label("الاختلافات: 0 / 7", 20, GOLD)
     root.add_child(feedback_label)
-    root.add_child(_button("تلميح", func(): _show_message("انظر جيداً إلى الصورة الثانية وابحث عن ثلاثة تفاصيل تغيرت.")))
+    root.add_child(_button("تلميح", func(): _show_message("انظر جيداً إلى الصورة الثانية وابحث عن سبعة تفاصيل تغيرت.")))
     root.add_child(_button("خريطة المراحل", func(): _show_levels("spot", false)))
 
 func _on_difference_found(total: int) -> void:
     found_differences = total
     if is_instance_valid(feedback_label):
-        feedback_label.text = "الاختلافات: %d / 3" % total
-    if total >= 3:
+        feedback_label.text = "الاختلافات: %d / 7" % total
+    if total >= 7:
         coins += 10
         stars += 1
         level_unlocked.spot = max(int(level_unlocked.spot), current_level + 1)
         _save_progress()
-        _show_result(true, "أحسنت! اكتشفت الاختلافات الثلاثة.")
+        _show_result(true, "أحسنت! اكتشفت الاختلافات السبعة.")
 
 func _show_result(won: bool, detail: String) -> void:
     _clear()
@@ -352,16 +351,15 @@ class PhotoSpotPuzzle:
     var image_b_path := "res://Art/spot_1_b.svg"
     var photo_a: Texture2D
     var photo_b: Texture2D
-    var hit := [false, false, false]
-    var difference_points: Array = [
-        Vector2(0.854, 0.190),
-        Vector2(0.188, 0.381),
-        Vector2(0.502, 0.695)
-    ]
+    var hit: Array[bool] = []
+    var difference_points: Array = []
 
     func _ready() -> void:
         photo_a = load(image_a_path) as Texture2D
         photo_b = load(image_b_path) as Texture2D
+        hit.clear()
+        for i in range(difference_points.size()):
+            hit.append(false)
         custom_minimum_size = Vector2(0, 500)
         mouse_filter = Control.MOUSE_FILTER_STOP
         queue_redraw()
