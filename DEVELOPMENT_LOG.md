@@ -34,3 +34,11 @@
 - إضافة GitHub Actions workflow في `.github/workflows/godot-check.yml` لتثبيت Godot 4.4.1 والتحقق من استيراد المشروع وتشغيل المشهد headless.
 - توضيح أن Workflow الحالي يتحقق من مشروع Godot ولا يصدر APK؛ تصدير Android ينتظر إعداد export preset وبيئة Android.
 - لا يُسجل نجاح تشغيل Godot أو APK قبل ظهور نتيجة Workflow فعلية وفحصها.
+
+## 2026-11-25 – نجاح فحص GitHub Actions (الخطوة 3)
+- اكتمل Workflow رقم 4 بنجاح: https://github.com/croceh2021-crypto/Puzzle-and-Mind/actions/runs/45697770555
+- نجح تثبيت Godot 4.4.1.
+- نجح استيراد موارد المشروع بوضع headless.
+- نجح تشغيل المشهد الرئيسي بوضع headless.
+- نجح فحص توفر إعداد Android؛ لكنه أكد أن `export_presets.cfg` غير موجود حالياً.
+- هذا نجاح لفحص استيراد وتشغيل المشهد آلياً فقط، وليس بناء APK أو اختباراً على محاكي/هاتف.
