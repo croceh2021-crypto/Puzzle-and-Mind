@@ -176,7 +176,7 @@ func _show_levels(world: String, push := true) -> void:
     if push: _push("worlds")
     _clear()
     _header("مراحل الألغاز" if world == "logic" else "مراحل الاختلافات")
-    var available_levels: int = _read_puzzles().size() if world == "logic" else 2
+    var available_levels: int = _read_puzzles().size() if world == "logic" else 5
     root.add_child(_label("المراحل المفتوحة: %d" % int(level_unlocked[world]), 18, GOLD))
     root.add_child(_label("المراحل المتاحة حالياً: %d من 25" % available_levels, 15, MUTED))
     var grid = GridContainer.new()
@@ -256,23 +256,37 @@ func _show_hint() -> void:
     _show_message(str(current_puzzle.hint))
 
 func _start_spot(level: int) -> void:
-    if level < 1 or level > 2:
-        _show_message("هذه المرحلة قيد الإعداد، وستُفتح عند إضافة صورتها واختبار اختلافاتها.")
+    if level < 1 or level > 5:
+        _show_message("هذه المرحلة غير متاحة حالياً.")
         return
     current_level = level
     found_differences = 0
     _show_spot(level)
+
+func _spot_stage_data(level: int) -> Dictionary:
+    var points_by_level := {
+        1: [Vector2(0.854, 0.190), Vector2(0.188, 0.381), Vector2(0.502, 0.695)],
+        2: [Vector2(0.125, 0.190), Vector2(0.365, 0.464), Vector2(0.896, 0.786)],
+        3: [Vector2(0.875, 0.179), Vector2(0.505, 0.298), Vector2(0.323, 0.810)],
+        4: [Vector2(0.823, 0.262), Vector2(0.500, 0.524), Vector2(0.177, 0.440)],
+        5: [Vector2(0.854, 0.179), Vector2(0.348, 0.350), Vector2(0.505, 0.845)]
+    }
+    return {
+        "image_a": "res://Art/spot_%d_a.svg" % level,
+        "image_b": "res://Art/spot_%d_b.svg" % level,
+        "points": points_by_level.get(level, points_by_level[1])
+    }
 
 func _show_spot(level: int) -> void:
     _clear()
     _header("اكتشف الاختلافات")
     root.add_child(_label("المرحلة %d  •  اكتشف 3 اختلافات" % level, 19, GOLD))
     root.add_child(_label("قارن الصورتين واضغط على مواضع الاختلاف في الصورة الثانية", 15, MUTED))
-    var image_path := "res://IMG-20261028-WA0002.jpg"
-    if level == 2:
-        image_path = "res://IMG-20261028-WA0006.jpg"
+    var stage_data: Dictionary = _spot_stage_data(level)
     var scene = PhotoSpotPuzzle.new()
-    scene.image_path = image_path
+    scene.image_a_path = str(stage_data.image_a)
+    scene.image_b_path = str(stage_data.image_b)
+    scene.difference_points = stage_data.points
     scene.custom_minimum_size = Vector2(0, 500)
     scene.size_flags_vertical = Control.SIZE_EXPAND_FILL
     scene.found.connect(_on_difference_found)
@@ -334,22 +348,25 @@ class PhotoSpotPuzzle:
     extends Control
     signal found(total: int)
 
-    var image_path := "res://IMG-20261028-WA0002.jpg"
-    var photo: Texture2D
+    var image_a_path := "res://Art/spot_1_a.svg"
+    var image_b_path := "res://Art/spot_1_b.svg"
+    var photo_a: Texture2D
+    var photo_b: Texture2D
     var hit := [false, false, false]
-    var difference_points := [
-        Vector2(0.18, 0.68),
-        Vector2(0.78, 0.56),
-        Vector2(0.52, 0.86)
+    var difference_points: Array = [
+        Vector2(0.854, 0.190),
+        Vector2(0.188, 0.381),
+        Vector2(0.502, 0.695)
     ]
 
     func _ready() -> void:
-        photo = load(image_path) as Texture2D
+        photo_a = load(image_a_path) as Texture2D
+        photo_b = load(image_b_path) as Texture2D
         custom_minimum_size = Vector2(0, 500)
         mouse_filter = Control.MOUSE_FILTER_STOP
         queue_redraw()
 
-    func _photo_rect(slot: int) -> Rect2:
+    func _photo_rect(slot: int, photo: Texture2D) -> Rect2:
         var gap := 18.0
         var slot_height := (size.y - gap) / 2.0
         var box := Vector2(size.x, slot_height)
@@ -365,35 +382,27 @@ class PhotoSpotPuzzle:
         return Rect2(origin, draw_size)
 
     func _draw() -> void:
-        var top_rect := _photo_rect(0)
-        var bottom_rect := _photo_rect(1)
+        var top_rect := _photo_rect(0, photo_a)
+        var bottom_rect := _photo_rect(1, photo_b)
         draw_rect(Rect2(Vector2.ZERO, size), Color("#0a1c35"), true)
-        if photo == null:
-            draw_string(ThemeDB.fallback_font, Vector2(20, 50), "تعذر تحميل الصورة", HORIZONTAL_ALIGNMENT_CENTER, size.x - 40, 20, Color("#ffffff"))
+        if photo_a == null or photo_b == null:
+            draw_string(ThemeDB.fallback_font, Vector2(20, 50), "تعذر تحميل صور المرحلة", HORIZONTAL_ALIGNMENT_CENTER, size.x - 40, 20, Color("#ffffff"))
             return
-        draw_texture_rect(photo, top_rect, false)
-        draw_texture_rect(photo, bottom_rect, false)
+        draw_texture_rect(photo_a, top_rect, false)
+        draw_texture_rect(photo_b, bottom_rect, false)
         draw_rect(top_rect, Color("#f2bd4b"), false, 3.0)
         draw_rect(bottom_rect, Color("#f2bd4b"), false, 3.0)
         draw_string(ThemeDB.fallback_font, Vector2(12, 24), "الصورة الأولى", HORIZONTAL_ALIGNMENT_LEFT, 180, 16, Color("#f2bd4b"))
         draw_string(ThemeDB.fallback_font, Vector2(12, bottom_rect.position.y + 24), "الصورة الثانية", HORIZONTAL_ALIGNMENT_LEFT, 180, 16, Color("#f2bd4b"))
-        # اختلافات مرئية صغيرة مضافة فوق نسخة الصورة الثانية؛ الأصل محفوظ كما هو.
         for i in range(difference_points.size()):
             if hit[i]:
-                continue
-            var p := bottom_rect.position + Vector2(difference_points[i].x * bottom_rect.size.x, difference_points[i].y * bottom_rect.size.y)
-            match i:
-                0:
-                    draw_circle(p, 7.0, Color("#f4c542"))
-                1:
-                    draw_rect(Rect2(p - Vector2(7, 7), Vector2(14, 14)), Color("#e65d55"), true)
-                2:
-                    draw_circle(p, 8.0, Color("#e9f0f7"))
-                    draw_circle(p, 3.0, Color("#24466b"))
+                var p := bottom_rect.position + Vector2(difference_points[i].x * bottom_rect.size.x, difference_points[i].y * bottom_rect.size.y)
+                draw_circle(p, 15.0, Color(0.25, 0.85, 0.55, 0.75))
+                draw_circle(p, 8.0, Color("#ffffff"))
 
     func _gui_input(event: InputEvent) -> void:
         if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-            var bottom_rect := _photo_rect(1)
+            var bottom_rect := _photo_rect(1, photo_b)
             if not bottom_rect.has_point(event.position):
                 return
             var local: Vector2 = (event.position - bottom_rect.position) / bottom_rect.size
@@ -403,10 +412,9 @@ class PhotoSpotPuzzle:
                     total += 1
                     continue
                 var target: Vector2 = difference_points[i] * bottom_rect.size
-                if (local * bottom_rect.size).distance_to(target) <= max(22.0, bottom_rect.size.x * 0.055):
+                if (local * bottom_rect.size).distance_to(target) <= max(18.0, bottom_rect.size.x * 0.035):
                     hit[i] = true
                     total += 1
             if total > 0:
                 queue_redraw()
                 found.emit(total)
-
