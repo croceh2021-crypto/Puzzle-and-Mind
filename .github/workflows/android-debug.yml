@@ -40,7 +40,11 @@ jobs:
       - name: Create temporary debug signing key
         run: |
           mkdir -p "$HOME/.android"
-          keytool -genkeypair -v             -keystore "$HOME/.android/debug.keystore"             -storepass android -alias androiddebugkey -keypass android             -keyalg RSA -keysize 2048 -validity 10000             -dname "CN=Android Debug,O=Android,C=US"
+          keytool -genkeypair -v \
+            -keystore "$HOME/.android/debug.keystore" \
+            -storepass android -alias androiddebugkey -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Configure Godot Android SDK paths
         run: |
@@ -85,4 +89,44 @@ jobs:
           name: Puzzle-and-Mind-Android-Debug
           path: build/PuzzleAndMind-debug.apk
           if-no-files-found: error
+          retention-days: 14
+
+  android-emulator-smoke:
+    name: Install and test in Pixel 2 Android Emulator
+    runs-on: macos-15-intel
+    needs: android-debug
+    timeout-minutes: 40
+    steps:
+      - name: Checkout project and emulator test script
+        uses: actions/checkout@v4
+
+      - name: Download APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Puzzle-and-Mind-Android-Debug
+          path: build
+
+      - name: Verify APK artifact
+        run: |
+          test -s build/PuzzleAndMind-debug.apk
+          ls -lh build/PuzzleAndMind-debug.apk
+
+      - name: Install and test game in Pixel emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: default
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics -memory 2048 -cores 2
+          disable-animations: false
+          script: bash .github/scripts/android-emulator-puzzle.sh
+
+      - name: Upload emulator screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Puzzle-and-Mind-Emulator-Test
+          path: test-results/
+          if-no-files-found: warn
           retention-days: 14
