@@ -56,7 +56,12 @@ jobs:
           EOF
 
       - name: Import project resources
-        run: godot --headless --editor --path . --quit
+        run: godot --headless --editor --path . --quit --verbose
+
+      - name: Diagnose Android export configuration
+        run: |
+          godot --headless --path . --verbose --export-debug "Android" /tmp/PuzzleAndMind-diagnostic.apk || true
+          echo "Diagnostic export completed; the following export step is authoritative."
 
       - name: Export Android debug APK
         env:
@@ -66,7 +71,7 @@ jobs:
         run: |
           mkdir -p build
           cp "$HOME/.android/debug.keystore" "${{ runner.temp }}/debug.keystore"
-          godot --headless --path . --export-debug "Android" build/PuzzleAndMind-debug.apk
+          godot --headless --path . --verbose --export-debug "Android" build/PuzzleAndMind-debug.apk
 
       - name: Verify APK output
         run: |
