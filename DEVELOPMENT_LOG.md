@@ -42,3 +42,11 @@
 - نجح تشغيل المشهد الرئيسي بوضع headless.
 - نجح فحص توفر إعداد Android؛ لكنه أكد أن `export_presets.cfg` غير موجود حالياً.
 - هذا نجاح لفحص استيراد وتشغيل المشهد آلياً فقط، وليس بناء APK أو اختباراً على محاكي/هاتف.
+
+## 2026-11-25 – إعداد تصدير Android وبناء APK تجريبي (الخطوة 4)
+- أضيف `export_presets.cfg` مع إعداد Android باسم `Android`، ومعرّف حزمة `org.puzzleandmind.game`، وبنية ARM64.
+- أضيف Workflow مستقل `.github/workflows/android-debug.yml` لتجهيز Java 17 وAndroid SDK وGodot 4.4.1 وقوالب التصدير.
+- ينشئ Workflow مفتاح Debug مؤقتاً في بيئة GitHub Actions، ولا يحفظ أي مفتاح أو كلمة مرور في المستودع.
+- يصدر الملف إلى `build/PuzzleAndMind-debug.apk` ثم يتحقق من وجوده ويرفعه كـ Artifact لمدة 14 يوماً.
+- حالة البناء الفعلية لم تُحسم بعد عند تسجيل هذه الخطوة؛ يجب فحص نتيجة Workflow قبل إعلان نجاح APK.
+- APK الناتج (إن نجح) هو نسخة Debug للاختبار وليست نسخة Release للنشر في Google Play.
