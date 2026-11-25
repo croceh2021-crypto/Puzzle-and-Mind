@@ -13,7 +13,8 @@ https://github.com/croceh2021-crypto/Puzzle-and-Mind
 
 ## حدود التحقق
 - نجاح عمليات الرفع موثق من استجابات GitHub لكل ملف.
-- لم يتم بعد التحقق من نجاح Workflow نفسه عند كتابة هذا التقرير.
+- [نجاح] اكتمل Workflow رقم 4 بنتيجة success: تثبيت Godot 4.4.1، استيراد الموارد، وتشغيل المشهد الرئيسي headless.
+- رابط نتيجة الفحص: https://github.com/croceh2021-crypto/Puzzle-and-Mind/actions/runs/45697770555
 - لا يوجد APK ناتج عن هذه الخطوة.
 - تصدير Android غير مفعّل بعد لعدم وجود `export_presets.cfg` وإعدادات التصدير المطلوبة.
 
