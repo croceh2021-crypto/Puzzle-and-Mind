@@ -1,5 +1,9 @@
 name: Godot Android debug APK
 
+concurrency:
+  group: puzzle-and-mind-${{ github.workflow }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main]
