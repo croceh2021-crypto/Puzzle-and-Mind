@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 RESULTS_DIR="test-results"
 PACKAGE_ID="org.puzzleandmind.game"
-APK="build/PuzzleAndMind-debug.apk"
+APK="build/PuzzleAndMind-emulator.apk"
 mkdir -p "$RESULTS_DIR"
 
 collect_diagnostics() {
