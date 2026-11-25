@@ -61,8 +61,9 @@ func _process(_delta: float) -> void:
         var t := float(music_sample_index) / float(MUSIC_RATE)
         var step_index := int(floor(t / MUSIC_STEP)) % MUSIC_MELODY.size()
         var phase := fposmod(t, MUSIC_STEP) / MUSIC_STEP
-        var note := MUSIC_MELODY[step_index]
-        var bass := MUSIC_MELODY[(step_index / 4 * 4) % MUSIC_MELODY.size()] * 0.25
+        var note: float = float(MUSIC_MELODY[step_index])
+        var bass_index: int = (int(step_index / 4) * 4) % MUSIC_MELODY.size()
+        var bass: float = float(MUSIC_MELODY[bass_index]) * 0.25
         var attack := minf(phase * 9.0, 1.0)
         var release := 1.0 - smoothstep(0.68, 1.0, phase)
         var envelope := attack * release
