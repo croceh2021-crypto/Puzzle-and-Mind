@@ -18,6 +18,7 @@ var current_level := 1
 var active_world := "logic"
 var hints_left := 3
 var found_differences := 0
+var stage_completed := false
 var level_unlocked := {"logic": 1, "spot": 1}
 var save_path := "user://puzzle_mind_save.json"
 var root: Control
@@ -218,6 +219,7 @@ func _read_puzzles() -> Array:
 
 func _start_logic(level: int) -> void:
     active_world = "logic"
+    stage_completed = false
     var puzzles = _read_puzzles()
     if puzzles.is_empty():
         _show_message("تعذر تحميل الألغاز")
@@ -277,6 +279,7 @@ func _start_spot(level: int) -> void:
         return
     current_level = level
     found_differences = 0
+    stage_completed = false
     _show_spot(level)
 
 func _spot_stage_data(level: int) -> Dictionary:
@@ -315,7 +318,8 @@ func _on_difference_found(total: int) -> void:
     found_differences = total
     if is_instance_valid(feedback_label):
         feedback_label.text = "الاختلافات: %d / 7" % total
-    if total >= 7:
+    if total >= 7 and not stage_completed:
+        stage_completed = true
         coins += 10
         stars += 1
         level_unlocked.spot = max(int(level_unlocked.spot), current_level + 1)
@@ -463,6 +467,10 @@ class PhotoSpotPuzzle:
 
 class ScreenBackdrop:
     extends Control
+
+    func _notification(what: int) -> void:
+        if what == NOTIFICATION_RESIZED:
+            queue_redraw()
 
     func _draw() -> void:
         var h := maxf(size.y, 1.0)
