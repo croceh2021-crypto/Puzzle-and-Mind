@@ -176,7 +176,9 @@ func _show_levels(world: String, push := true) -> void:
     if push: _push("worlds")
     _clear()
     _header("مراحل الألغاز" if world == "logic" else "مراحل الاختلافات")
+    var available_levels: int = _read_puzzles().size() if world == "logic" else 2
     root.add_child(_label("المراحل المفتوحة: %d" % int(level_unlocked[world]), 18, GOLD))
+    root.add_child(_label("المراحل المتاحة حالياً: %d من 25" % available_levels, 15, MUTED))
     var grid = GridContainer.new()
     grid.columns = 4
     grid.add_theme_constant_override("h_separation", 10)
@@ -184,7 +186,7 @@ func _show_levels(world: String, push := true) -> void:
     root.add_child(grid)
     for i in range(1, 26):
         var n = i
-        var locked = n > int(level_unlocked[world])
+        var locked = n > int(level_unlocked[world]) or n > available_levels
         var b = _button("🔒" if locked else str(n), func(): _start_logic(n) if world == "logic" else _start_spot(n), not locked)
         b.custom_minimum_size = Vector2(0, 68)
         b.disabled = locked
@@ -205,10 +207,12 @@ func _start_logic(level: int) -> void:
     if puzzles.is_empty():
         _show_message("تعذر تحميل الألغاز")
         return
+    if level < 1 or level > puzzles.size():
+        _show_message("هذه المرحلة لم تُضف إلى محتوى اللعبة بعد.")
+        return
     current_level = level
-    puzzle_index = (level - 1) % puzzles.size()
+    puzzle_index = level - 1
     current_puzzle = puzzles[puzzle_index].duplicate(true)
-    current_puzzle["id"] = level
     _show_logic()
 
 func _show_logic() -> void:
@@ -252,6 +256,9 @@ func _show_hint() -> void:
     _show_message(str(current_puzzle.hint))
 
 func _start_spot(level: int) -> void:
+    if level < 1 or level > 2:
+        _show_message("هذه المرحلة قيد الإعداد، وستُفتح عند إضافة صورتها واختبار اختلافاتها.")
+        return
     current_level = level
     found_differences = 0
     _show_spot(level)
@@ -306,7 +313,12 @@ func _show_achievements() -> void:
     _header("الإنجازات")
     root.add_child(_label("⭐ مجموع النجوم: %d" % stars, 25, GOLD))
     root.add_child(_label("🪙 مجموع العملات: %d" % coins, 25, GOLD))
-    root.add_child(_label("إنجازات جديدة ستضاف مع توسعة المراحل.", 18, MUTED))
+    root.add_child(_label("إنجازات النجوم", 20, GOLD))
+    root.add_child(_label(("🏅 مبتدئ: %d / 1" % min(stars, 1)) + ("   ✓" if stars >= 1 else ""), 17))
+    root.add_child(_label(("🥉 مجتهد: %d / 10" % min(stars, 10)) + ("   ✓" if stars >= 10 else ""), 17))
+    root.add_child(_label(("🥈 خبير: %d / 25" % min(stars, 25)) + ("   ✓" if stars >= 25 else ""), 17))
+    root.add_child(_label(("🥇 بطل الذكاء: %d / 50" % min(stars, 50)) + ("   ✓" if stars >= 50 else ""), 17))
+    root.add_child(_label("تُحتسب النجوم عند إكمال المراحل بنجاح.", 15, MUTED))
     root.add_child(_button("عودة", _show_home))
 
 func _show_settings() -> void:
