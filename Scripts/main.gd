@@ -127,7 +127,22 @@ func _push(screen: String) -> void:
 func _show_home(push := true) -> void:
     if push: screen_stack.clear()
     _clear()
-    root.add_child(_label("🧠", 76, GOLD))
+    var hero_frame = PanelContainer.new()
+    hero_frame.custom_minimum_size = Vector2(0, 330)
+    hero_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    var hero_style = StyleBoxFlat.new()
+    hero_style.bg_color = PANEL
+    hero_style.border_color = GOLD
+    hero_style.set_border_width_all(2)
+    hero_style.set_corner_radius_all(22)
+    hero_frame.add_theme_stylebox_override("panel", hero_style)
+    var hero_image = TextureRect.new()
+    hero_image.texture = load("res://moh.png")
+    hero_image.custom_minimum_size = Vector2(0, 310)
+    hero_image.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+    hero_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+    hero_frame.add_child(hero_image)
+    root.add_child(hero_frame)
     root.add_child(_label("لغز وذكاء", 42, GOLD))
     root.add_child(_label("PUZZLE & MIND", 20, MUTED))
     root.add_child(_label("اكتشف .. فكّر .. حقق الفوز", 20))
