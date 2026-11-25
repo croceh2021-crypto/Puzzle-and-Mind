@@ -1,8 +1,8 @@
 {
   "stage": 1,
   "title": "سوق القرية الجبلية",
-  "image_a": "res://Art/spot_1_a.png",
-  "image_b": "res://Art/spot_1_b.png",
+  "image_a": "res://Art/a_bright_high_detail_photorealistic_mountain_vil.png",
+  "image_b": "res://Art/PM_stage01_B_local.png",
   "image_size": {
     "width": 1672,
     "height": 941
