@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   android-debug:
@@ -15,6 +15,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Losslessly optimize home image
+        run: bash .github/scripts/optimize-home-image.sh
 
       - name: Setup Java 17
         uses: actions/setup-java@v4
