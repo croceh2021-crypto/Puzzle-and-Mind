@@ -34,3 +34,7 @@ The repository now includes an Android export preset and a GitHub Actions workfl
 
 ## اختبار Android Emulator
 تمت إضافة مهمة محاكي Pixel 2 إلى `.github/workflows/android-debug.yml`. بعد بناء APK، تقوم المهمة بتثبيته وتشغيله والتقاط لقطات شاشة أثناء محاولة الانتقال من الشاشة الرئيسية إلى عالم اكتشاف الاختلافات والمرحلة الأولى، مع حفظ سجلات Android. راجع Artifact باسم `Puzzle-and-Mind-Emulator-Test` ونتيجة مهمة المحاكي؛ لا تعتبر الاختبار ناجحاً قبل اكتمال المهمة وفحص الأدلة.
+
+
+## تحسين حجم APK
+تم استبعاد صورتين غير مستخدمتين حالياً من تصدير Android فقط عبر `exclude_filter`: `IMG20261022174658.jpg` و`IMG20261022174713.jpg`. بقيتا محفوظتين في المستودع لاستخدام مستقبلي. لم تُخفض دقة الصور المعروضة داخل اللعبة. يجب مراجعة نتيجة GitHub Actions وحجم APK الجديد قبل اعتماد مقدار التوفير.
