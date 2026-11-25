@@ -93,7 +93,7 @@ jobs:
 
   android-emulator-smoke:
     name: Install and test in Pixel 2 Android Emulator
-    runs-on: macos-15-intel
+    runs-on: ubuntu-latest
     needs: android-debug
     timeout-minutes: 40
     steps:
