@@ -89,15 +89,18 @@ jobs:
           godot --headless --path . --verbose --export-debug "Android" build/PuzzleAndMind-debug.apk
 
       - name: Create temporary release signing key for optimized test APK
+        id: release_key
         run: |
           RELEASE_PASS="$(openssl rand -hex 16)"
+          echo "::add-mask::$RELEASE_PASS"
           keytool -genkeypair -v -keystore "${{ runner.temp }}/puzzle-release.keystore" -storepass "$RELEASE_PASS" -alias puzzlemindrelease -keypass "$RELEASE_PASS" -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Puzzle Mind Test,O=Puzzle Mind,C=YE"
-          echo "GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=$RELEASE_PASS" >> "$GITHUB_ENV"
+          echo "password=$RELEASE_PASS" >> "$GITHUB_OUTPUT"
 
       - name: Export optimized ARM64 release APK
         env:
           GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ runner.temp }}/puzzle-release.keystore
           GODOT_ANDROID_KEYSTORE_RELEASE_USER: puzzlemindrelease
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ steps.release_key.outputs.password }}
         run: |
           godot --headless --path . --verbose --export-release "Android" build/PuzzleAndMind-optimized.apk
           test -s build/PuzzleAndMind-optimized.apk
