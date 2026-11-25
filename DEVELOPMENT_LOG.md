@@ -71,3 +71,11 @@
 - مرجع الخصائص الرسمي: https://docs.godotengine.org/en/4.4/classes/class_editorexportplatformandroid.html
 - تم تشغيل GitHub Actions مجدداً على الالتزام `dccb90dd68713de9d7694c4b8a2a389241005981`؛ نتيجة بناء APK قيد التحقق، ولا يُعلن النجاح قبل ظهور artifact وفحص حجمه.
 - لم يتم بعد استبدال مشهد الاختلافات التجريبي بصور مزدوجة ذات مناطق اختلاف موثقة.
+
+
+## 2026-11-25 – إصلاح شرط تصدير Android المتعلق بضغط الصور (الخطوة 7)
+- أظهر فحص كود Godot 4.4.1 الرسمي أن فحص صلاحية تصدير Android يرفض المشروع إذا لم يكن استيراد ETC2/ASTC مفعّلاً (`ResourceImporterTextureSettings::should_import_etc2_astc()`).
+- بيئة GitHub Actions تعمل على Linux، ولا تستخدم ETC2/ASTC افتراضياً؛ لذلك كان preset يُرفض رغم نجاح إعداد Java وAndroid SDK والقوالب.
+- تمت إضافة إعداد المشروع `rendering/textures/vram_compression/import_etc2_astc=true` ليُنشئ Godot موارد ETC2/ASTC اللازمة لتصدير Android.
+- هذا إصلاح مبني على شرط التحقق داخل مصدر Godot 4.4، ويظل نجاح APK معلقاً على نتيجة Workflow التالية والتحقق من Artifact.
+- مرجع المصدر: https://github.com/godotengine/godot/blob/4.4-stable/editor/import/resource_importer_texture_settings.cpp وhttps://github.com/godotengine/godot/blob/4.4-stable/platform/android/export/export_plugin.cpp
