@@ -43,6 +43,20 @@ fi
 
 adb exec-out screencap -p > "$RESULTS_DIR/01-home-screen.png"
 test -s "$RESULTS_DIR/01-home-screen.png"
+python3 - "$RESULTS_DIR/01-home-screen.png" <<'PY'
+import sys
+from PIL import Image, ImageStat
+
+path = sys.argv[1]
+image = Image.open(path).convert("RGB")
+image.thumbnail((128, 128))
+stats = ImageStat.Stat(image)
+spread = sum(stats.stddev) / 3
+colors = len(image.getcolors(maxcolors=128 * 128) or [])
+print(f"Home screenshot: {image.size[0]}x{image.size[1]}, color spread={spread:.2f}, colors={colors}")
+if spread < 5.0 or colors < 40:
+    raise SystemExit("FAIL: home screenshot appears blank or nearly uniform.")
+PY
 
 # Home screen: tap the primary "ابدأ اللعب" button.
 echo "Tapping the primary play button"
