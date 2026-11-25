@@ -27,6 +27,9 @@ jobs:
       - name: Launch main scene headlessly
         run: godot --headless --path . --quit-after 5
 
+      - name: Test photo difference stages and tap targets
+        run: godot --headless --path . --script res://tests/spot_puzzle_smoke.gd
+
       - name: Check Android export preset availability
         run: |
           if [ -f export_presets.cfg ]; then
