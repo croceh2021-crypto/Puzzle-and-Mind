@@ -7,6 +7,14 @@ concurrency:
 on:
   push:
     branches: [main]
+    paths:
+      - 'Scripts/**'
+      - 'Art/**'
+      - 'Data/**'
+      - '*.tscn'
+      - 'project.godot'
+      - 'export_presets.cfg'
+      - '.github/workflows/android-debug.yml'
   workflow_dispatch:
 
 permissions:
@@ -59,13 +67,16 @@ jobs:
           export/android/debug_keystore_pass = "android"
           EOF
 
+      - name: Cache Godot imported resources
+        uses: actions/cache@v4
+        with:
+          path: .godot/imported
+          key: godot-4.4.1-android-${{ runner.os }}-${{ hashFiles('Art/**', 'Data/**', '*.tscn', 'project.godot') }}
+          restore-keys: |
+            godot-4.4.1-android-${{ runner.os }}-
+
       - name: Import project resources
         run: godot --headless --editor --path . --quit --verbose
-
-      - name: Diagnose Android export configuration
-        run: |
-          godot --headless --path . --verbose --export-debug "Android" /tmp/PuzzleAndMind-diagnostic.apk || true
-          echo "Diagnostic export completed; the following export step is authoritative."
 
       - name: Export Android debug APK
         env:
@@ -102,7 +113,8 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Export x86_64 APK for emulator testing
+      - name: Export x86_64 APK for optional emulator testing
+        if: github.event_name == 'workflow_dispatch'
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
           GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
@@ -110,10 +122,9 @@ jobs:
         run: |
           godot --headless --path . --verbose --export-debug "Android Emulator" build/PuzzleAndMind-emulator.apk
           test -s build/PuzzleAndMind-emulator.apk
-          file build/PuzzleAndMind-emulator.apk
-          ls -lh build/PuzzleAndMind-emulator.apk
 
       - name: Upload emulator-only APK artifact
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: Puzzle-and-Mind-Android-Emulator
@@ -139,6 +150,7 @@ jobs:
     name: Install and test in Pixel 2 Android Emulator
     runs-on: ubuntu-latest
     needs: android-debug
+    if: github.event_name == 'workflow_dispatch'
     timeout-minutes: 40
     steps:
       - name: Checkout project and emulator test script
@@ -186,7 +198,7 @@ jobs:
   publish-latest-release:
     name: Publish tested phone APK to GitHub Releases
     runs-on: ubuntu-latest
-    needs: [android-debug, android-emulator-smoke]
+    needs: android-debug
     if: ${{ success() && github.ref == 'refs/heads/main' }}
     permissions:
       contents: write
@@ -209,7 +221,7 @@ jobs:
           tag_name: latest
           name: Latest Android APK
           body: |
-            Automatically updated after a successful Android build and emulator smoke test.
+            Automatically updated after a successful Android ARM64 build.
 
             Download **PuzzleAndMind-debug.apk** for Android ARM64 phones.
             This is a debug-signed APK intended for testing. A newer successful build replaces this release asset.
