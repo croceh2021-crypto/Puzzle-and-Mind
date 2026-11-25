@@ -15,6 +15,7 @@ var stars := 0
 var current_puzzle: Dictionary = {}
 var puzzle_index := 0
 var current_level := 1
+var active_world := "logic"
 var hints_left := 3
 var found_differences := 0
 var level_unlocked := {"logic": 1, "spot": 1}
@@ -48,6 +49,10 @@ func _load_progress() -> void:
 func _clear() -> void:
     for child in get_children():
         child.queue_free()
+    var backdrop = ScreenBackdrop.new()
+    backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    add_child(backdrop)
     root = VBoxContainer.new()
     root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     root.add_theme_constant_override("separation", 14)
@@ -92,7 +97,16 @@ func _button(text_value: String, callback: Callable, primary := false) -> Button
     b.add_theme_stylebox_override("normal", normal)
     var hover = normal.duplicate()
     hover.bg_color = Color("#d99d2e") if primary else Color("#214a79")
+    hover.border_color = Color("#fff0bd")
     b.add_theme_stylebox_override("hover", hover)
+    var pressed = normal.duplicate()
+    pressed.bg_color = Color("#bd8425") if primary else Color("#0b2341")
+    b.add_theme_stylebox_override("pressed", pressed)
+    var disabled = normal.duplicate()
+    disabled.bg_color = Color("#26364b")
+    disabled.border_color = Color("#3c4c60")
+    b.add_theme_stylebox_override("disabled", disabled)
+    b.add_theme_stylebox_override("focus", hover)
     b.pressed.connect(callback)
     return b
 
@@ -203,6 +217,7 @@ func _read_puzzles() -> Array:
     return parsed if typeof(parsed) == TYPE_ARRAY else []
 
 func _start_logic(level: int) -> void:
+    active_world = "logic"
     var puzzles = _read_puzzles()
     if puzzles.is_empty():
         _show_message("تعذر تحميل الألغاز")
@@ -256,6 +271,7 @@ func _show_hint() -> void:
     _show_message(str(current_puzzle.hint))
 
 func _start_spot(level: int) -> void:
+    active_world = "spot"
     if level < 1 or level > 25:
         _show_message("هذه المرحلة غير متاحة حالياً.")
         return
@@ -308,12 +324,39 @@ func _on_difference_found(total: int) -> void:
 
 func _show_result(won: bool, detail: String) -> void:
     _clear()
-    root.add_child(_label("🏆" if won else "حاول مجدداً", 58, GOLD))
-    root.add_child(_label("أحسنت! اكتملت المرحلة" if won else "لم تكتمل المرحلة", 28))
-    root.add_child(_label(detail, 19, MUTED))
-    root.add_child(_label("🪙 %d     ⭐ %d" % [coins, stars], 22, GOLD))
-    root.add_child(_button("متابعة", _show_worlds, true))
-    root.add_child(_button("القائمة الرئيسية", _show_home))
+    var spacer_top = Control.new()
+    spacer_top.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    root.add_child(spacer_top)
+    var result_card = PanelContainer.new()
+    var result_style = StyleBoxFlat.new()
+    result_style.bg_color = Color("#102d4d")
+    result_style.border_color = GOLD
+    result_style.set_border_width_all(2)
+    result_style.set_corner_radius_all(28)
+    result_style.content_margin_left = 22
+    result_style.content_margin_right = 22
+    result_style.content_margin_top = 28
+    result_style.content_margin_bottom = 28
+    result_card.add_theme_stylebox_override("panel", result_style)
+    var result_body = VBoxContainer.new()
+    result_body.add_theme_constant_override("separation", 18)
+    result_card.add_child(result_body)
+    result_body.add_child(_label("🏆" if won else "حاول مجدداً", 58, GOLD))
+    result_body.add_child(_label("أحسنت! اكتملت المرحلة" if won else "لم تكتمل المرحلة", 28))
+    result_body.add_child(_label(detail, 19, MUTED))
+    result_body.add_child(_label("🪙 %d     ⭐ %d" % [coins, stars], 22, GOLD))
+    root.add_child(result_card)
+    root.add_child(_label("سيتم نقلك تلقائياً إلى خريطة المراحل...", 16, MUTED))
+    var spacer_bottom = Control.new()
+    spacer_bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    root.add_child(spacer_bottom)
+    if won:
+        await get_tree().create_timer(1.8).timeout
+        if is_inside_tree():
+            _show_levels(active_world, false)
+    else:
+        root.add_child(_button("العودة للمراحل", func(): _show_levels(active_world, false), true))
+        root.add_child(_button("القائمة الرئيسية", _show_home))
 
 func _show_message(message: String) -> void:
     var dialog = AcceptDialog.new()
@@ -416,3 +459,19 @@ class PhotoSpotPuzzle:
             if total > 0:
                 queue_redraw()
                 found.emit(total)
+
+
+class ScreenBackdrop:
+    extends Control
+
+    func _draw() -> void:
+        var h := maxf(size.y, 1.0)
+        for i in range(32):
+            var t := float(i) / 31.0
+            var c := Color("#07152d").lerp(Color("#102c4b"), t * 0.72)
+            draw_rect(Rect2(0, h * t, size.x, h / 32.0 + 2.0), c, true)
+        draw_circle(Vector2(size.x * 0.88, size.y * 0.12), size.x * 0.30, Color(0.16, 0.36, 0.58, 0.12))
+        draw_circle(Vector2(size.x * 0.08, size.y * 0.78), size.x * 0.24, Color(0.12, 0.52, 0.48, 0.09))
+        for i in range(8):
+            var x := size.x * (0.08 + float(i) * 0.12)
+            draw_circle(Vector2(x, size.y * 0.08), 2.0 + float(i % 3), Color(0.95, 0.76, 0.35, 0.35))
