@@ -260,15 +260,19 @@ func _show_spot(level: int) -> void:
     _clear()
     _header("اكتشف الاختلافات")
     root.add_child(_label("المرحلة %d  •  اكتشف 3 اختلافات" % level, 19, GOLD))
-    root.add_child(_label("نموذج تجريبي: اضغط على الدوائر الثلاث في الصورة", 16, MUTED))
-    var scene = SpotPuzzle.new()
-    scene.custom_minimum_size = Vector2(0, 470)
+    root.add_child(_label("قارن الصورتين واضغط على مواضع الاختلاف في الصورة الثانية", 15, MUTED))
+    var image_path := "res://IMG-20261028-WA0002.jpg"
+    if level == 2:
+        image_path = "res://IMG-20261028-WA0006.jpg"
+    var scene = PhotoSpotPuzzle.new()
+    scene.image_path = image_path
+    scene.custom_minimum_size = Vector2(0, 500)
     scene.size_flags_vertical = Control.SIZE_EXPAND_FILL
     scene.found.connect(_on_difference_found)
     root.add_child(scene)
     feedback_label = _label("الاختلافات: 0 / 3", 20, GOLD)
     root.add_child(feedback_label)
-    root.add_child(_button("تلميح", func(): _show_message("ابحث عن العناصر المحاطة بعلامات خافتة.")))
+    root.add_child(_button("تلميح", func(): _show_message("انظر جيداً إلى الصورة الثانية وابحث عن ثلاثة تفاصيل تغيرت.")))
     root.add_child(_button("خريطة المراحل", func(): _show_levels("spot", false)))
 
 func _on_difference_found(total: int) -> void:
@@ -314,55 +318,83 @@ func _show_settings() -> void:
     root.add_child(_button("عودة", _show_home))
 
 
-class SpotPuzzle:
+class PhotoSpotPuzzle:
     extends Control
     signal found(total: int)
+
+    var image_path := "res://IMG-20261028-WA0002.jpg"
+    var photo: Texture2D
     var hit := [false, false, false]
-    var taps := 0
+    var difference_points := [
+        Vector2(0.18, 0.68),
+        Vector2(0.78, 0.56),
+        Vector2(0.52, 0.86)
+    ]
 
     func _ready() -> void:
-        custom_minimum_size = Vector2(0, 460)
+        photo = load(image_path) as Texture2D
+        custom_minimum_size = Vector2(0, 500)
         mouse_filter = Control.MOUSE_FILTER_STOP
+        queue_redraw()
+
+    func _photo_rect(slot: int) -> Rect2:
+        var gap := 18.0
+        var slot_height := (size.y - gap) / 2.0
+        var box := Vector2(size.x, slot_height)
+        if photo == null:
+            return Rect2(0, slot * (slot_height + gap), box.x, box.y)
+        var ratio := float(photo.get_width()) / float(photo.get_height())
+        var draw_size := box
+        if draw_size.x / draw_size.y > ratio:
+            draw_size.x = draw_size.y * ratio
+        else:
+            draw_size.y = draw_size.x / ratio
+        var origin := Vector2((size.x - draw_size.x) * 0.5, slot * (slot_height + gap) + (slot_height - draw_size.y) * 0.5)
+        return Rect2(origin, draw_size)
 
     func _draw() -> void:
-        var w = size.x
-        var half = w / 2.0 - 6
-        var h = size.y
-        draw_rect(Rect2(0, 0, half, h), Color("#d7c6a7"), true)
-        draw_rect(Rect2(half + 12, 0, half, h), Color("#d7c6a7"), true)
-        for side in range(2):
-            var ox = 0.0 if side == 0 else half + 12
-            draw_rect(Rect2(ox + 18, 20, half - 36, 130), Color("#91b6cb"))
-            draw_rect(Rect2(ox + 18, 150, half - 36, 220), Color("#b79a78"))
-            draw_rect(Rect2(ox + 38, 175, half - 76, 110), Color("#f0dfc3"))
-            draw_circle(Vector2(ox + half * 0.5, 330), 44, Color("#78513d"))
-            draw_rect(Rect2(ox + 28, 360, half - 56, 24), Color("#61412f"))
-            draw_circle(Vector2(ox + half * 0.5, 95), 24, Color("#e8c46e"))
-            draw_rect(Rect2(ox + 42, 190, 36, 60), Color("#427d58"))
-            draw_rect(Rect2(ox + half - 78, 190, 36, 60), Color("#427d58"))
-        # الاختلافات التجريبية: لون النافذة، النبات، والساعة
-        draw_circle(Vector2(half + 12 + half * 0.5, 95), 24, Color("#e86e5c") if not hit[0] else Color("#e8c46e"))
-        draw_rect(Rect2(half + 12 + 42, 190, 36, 60), Color("#d1a33c") if not hit[1] else Color("#427d58"))
-        draw_circle(Vector2(half + 12 + half * 0.5, 330), 44, Color("#385c8a") if not hit[2] else Color("#78513d"))
-        draw_line(Vector2(half + 12, 0), Vector2(half + 12, h), Color("#f4d18b"), 4)
+        var top_rect := _photo_rect(0)
+        var bottom_rect := _photo_rect(1)
+        draw_rect(Rect2(Vector2.ZERO, size), Color("#0a1c35"), true)
+        if photo == null:
+            draw_string(ThemeDB.fallback_font, Vector2(20, 50), "تعذر تحميل الصورة", HORIZONTAL_ALIGNMENT_CENTER, size.x - 40, 20, Color("#ffffff"))
+            return
+        draw_texture_rect(photo, top_rect, false)
+        draw_texture_rect(photo, bottom_rect, false)
+        draw_rect(top_rect, Color("#f2bd4b"), false, 3.0)
+        draw_rect(bottom_rect, Color("#f2bd4b"), false, 3.0)
+        draw_string(ThemeDB.fallback_font, Vector2(12, 24), "الصورة الأولى", HORIZONTAL_ALIGNMENT_LEFT, 180, 16, Color("#f2bd4b"))
+        draw_string(ThemeDB.fallback_font, Vector2(12, bottom_rect.position.y + 24), "الصورة الثانية", HORIZONTAL_ALIGNMENT_LEFT, 180, 16, Color("#f2bd4b"))
+        # اختلافات مرئية صغيرة مضافة فوق نسخة الصورة الثانية؛ الأصل محفوظ كما هو.
+        for i in range(difference_points.size()):
+            if hit[i]:
+                continue
+            var p := bottom_rect.position + Vector2(difference_points[i].x * bottom_rect.size.x, difference_points[i].y * bottom_rect.size.y)
+            match i:
+                0:
+                    draw_circle(p, 7.0, Color("#f4c542"))
+                1:
+                    draw_rect(Rect2(p - Vector2(7, 7), Vector2(14, 14)), Color("#e65d55"), true)
+                2:
+                    draw_circle(p, 8.0, Color("#e9f0f7"))
+                    draw_circle(p, 3.0, Color("#24466b"))
 
     func _gui_input(event: InputEvent) -> void:
-        if event is InputEventMouseButton and event.pressed:
-            var half = size.x / 2.0 - 6
-            if event.position.x < half:
+        if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+            var bottom_rect := _photo_rect(1)
+            if not bottom_rect.has_point(event.position):
                 return
-            var local = event.position - Vector2(half + 12, 0)
-            var idx = -1
-            if local.y < 140 and local.x > half * 0.30 and local.x < half * 0.70:
-                idx = 0
-            elif local.y > 180 and local.y < 270 and local.x < 100:
-                idx = 1
-            elif local.y > 285 and local.y < 380:
-                idx = 2
-            if idx >= 0 and not hit[idx]:
-                hit[idx] = true
+            var local := (event.position - bottom_rect.position) / bottom_rect.size
+            var total := 0
+            for i in range(difference_points.size()):
+                if hit[i]:
+                    total += 1
+                    continue
+                var target := difference_points[i] * bottom_rect.size
+                if (local * bottom_rect.size).distance_to(target) <= max(22.0, bottom_rect.size.x * 0.055):
+                    hit[i] = true
+                    total += 1
+            if total > 0:
                 queue_redraw()
-                var total = 0
-                for v in hit:
-                    if v: total += 1
                 found.emit(total)
+
