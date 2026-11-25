@@ -117,7 +117,7 @@ jobs:
           retention-days: 14
 
       - name: Export x86_64 APK for optional emulator testing
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[emulator-test]'))
         env:
           GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ runner.temp }}/debug.keystore
           GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
@@ -127,7 +127,7 @@ jobs:
           test -s build/PuzzleAndMind-emulator.apk
 
       - name: Upload emulator-only APK artifact
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[emulator-test]'))
         uses: actions/upload-artifact@v4
         with:
           name: Puzzle-and-Mind-Android-Emulator
