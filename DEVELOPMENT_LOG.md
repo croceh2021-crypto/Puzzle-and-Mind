@@ -79,3 +79,17 @@
 - تمت إضافة إعداد المشروع `rendering/textures/vram_compression/import_etc2_astc=true` ليُنشئ Godot موارد ETC2/ASTC اللازمة لتصدير Android.
 - هذا إصلاح مبني على شرط التحقق داخل مصدر Godot 4.4، ويظل نجاح APK معلقاً على نتيجة Workflow التالية والتحقق من Artifact.
 - مرجع المصدر: https://github.com/godotengine/godot/blob/4.4-stable/editor/import/resource_importer_texture_settings.cpp وhttps://github.com/godotengine/godot/blob/4.4-stable/platform/android/export/export_plugin.cpp
+
+
+## 2026-11-25 – تنفيذ مرحلتي الصور الفعلية ونجاح أول APK (الخطوة 8)
+- استُبدل مشهد الاختلافات المرسوم بالكامل بأشكال تجريبية بمكوّن يعرض صورة حقيقية مرتين، مع الحفاظ على نسبة أبعاد الصورة وعدم قصها.
+- المرحلة 1 تستخدم `IMG-20261028-WA0002.jpg`، والمرحلة 2 تستخدم `IMG-20261028-WA0006.jpg`.
+- تُرسم ثلاثة تغييرات صغيرة على النسخة الثانية داخل اللعبة، وتُربط كل نقطة اختلاف بمنطقة لمس مطابقة؛ عند العثور عليها تختفي العلامة ويُحدّث عدّاد التقدم.
+- الصور الأصلية في المستودع لم تُعدّل ولم تُستبدل؛ التغييرات تُرسم وقت التشغيل فوق نسخة العرض فقط.
+- نجح فحص Godot 4.4.1 على الالتزام `34254e47913b2c7493d20969618e6d7da4320a28`: استيراد الموارد وتشغيل المشهد الرئيسي headless.
+- نجح بناء Android Debug APK على الالتزام نفسه: Workflow https://github.com/croceh2021-crypto/Puzzle-and-Mind/actions/runs/45700285642
+- اكتملت خطوات `Export Android debug APK` و`Verify APK output` و`Upload APK artifact` بنجاح.
+- Artifact: `Puzzle-and-Mind-Android-Debug`، الحجم 42,199,866 بايت تقريباً (ZIP)، وملف APK داخله 42,771,550 بايت.
+- تم تنزيل الـ APK وفحص نوع الملف ومحتويات ZIP؛ ظهر كحزمة Android صالحة بنيوياً، واجتاز اختبار سلامة ZIP.
+- هذه نسخة Debug موقعة بمفتاح مؤقت من CI وليست إصدار Release للنشر.
+- لم يُختبر تثبيت اللعبة أو لمس مناطق الاختلاف على هاتف فعلي حتى الآن؛ يلزم اختبار الجهاز للتأكد من المظهر والملاءمة والأداء.
