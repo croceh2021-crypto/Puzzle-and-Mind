@@ -21,11 +21,25 @@ jobs:
           version: 4.4.1
           use-dotnet: false
 
-      - name: Import project resources
-        run: godot --headless --editor --path . --quit
+      - name: Import project resources and fail on script errors
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --editor --path . --quit --verbose 2>&1 | tee /tmp/godot-import.log
+          if grep -E -i "SCRIPT ERROR:|Parse Error:|Failed to load script|ERROR: Failed to load" /tmp/godot-import.log; then
+            echo "Godot reported a script/import error."
+            exit 1
+          fi
 
-      - name: Launch main scene headlessly
-        run: godot --headless --path . --quit-after 5
+      - name: Launch main scene and fail on runtime script errors
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path . --quit-after 5 2>&1 | tee /tmp/godot-runtime.log
+          if grep -E -i "SCRIPT ERROR:|Parse Error:|Failed to load script|ERROR: Failed to load" /tmp/godot-runtime.log; then
+            echo "Godot reported a runtime script error."
+            exit 1
+          fi
 
       - name: Check Android export preset availability
         run: |
