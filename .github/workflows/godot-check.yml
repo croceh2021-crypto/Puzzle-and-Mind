@@ -1,0 +1,36 @@
+name: Godot project check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate project with Godot 4.4.1
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.4.1
+          use-dotnet: false
+
+      - name: Import project resources
+        run: godot --headless --editor --path . --quit
+
+      - name: Launch main scene headlessly
+        run: godot --headless --path . --quit-after 5
+
+      - name: Check Android export preset availability
+        run: |
+          if [ -f export_presets.cfg ]; then
+            echo "Android export preset found. APK export can be enabled after Android SDK/export templates are configured."
+          else
+            echo "Android export preset is not configured yet; this workflow validates the Godot project only."
+          fi
