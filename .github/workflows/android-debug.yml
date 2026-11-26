@@ -15,6 +15,7 @@ on:
       - 'project.godot'
       - 'export_presets.cfg'
       - '.github/workflows/android-debug.yml'
+      - '.github/scripts/**'
   workflow_dispatch:
 
 permissions:
@@ -77,6 +78,21 @@ jobs:
 
       - name: Import project resources
         run: godot --headless --editor --path . --quit --verbose
+
+      - name: Validate project and main scene before Android export
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --editor --path . --quit --verbose 2>&1 | tee /tmp/android-godot-import.log
+          if grep -E -i "SCRIPT ERROR:|Parse Error:|Failed to load script|ERROR: Failed to load" /tmp/android-godot-import.log; then
+            echo "Godot import reported a script error."
+            exit 1
+          fi
+          godot --headless --path . --quit-after 5 2>&1 | tee /tmp/android-godot-runtime.log
+          if grep -E -i "SCRIPT ERROR:|Parse Error:|Failed to load script|ERROR: Failed to load" /tmp/android-godot-runtime.log; then
+            echo "Godot runtime reported a script error."
+            exit 1
+          fi
 
       - name: Export Android debug APK
         env:
