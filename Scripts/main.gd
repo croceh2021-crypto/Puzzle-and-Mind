@@ -19,6 +19,10 @@ var active_world := "logic"
 var hints_left := 3
 var found_differences := 0
 var stage_completed := false
+var room_challenge := ""
+var room_answer := ""
+var room_sequence_progress := 0
+var room_completed := {}
 var level_unlocked := {"logic": 1, "spot": 1}
 var save_path := "user://puzzle_mind_save.json"
 var root: Control
@@ -88,7 +92,7 @@ func _on_music_volume_changed(value: float) -> void:
     _save_progress()
 
 func _save_progress() -> void:
-    var data = {"coins": coins, "stars": stars, "logic": level_unlocked.logic, "spot": level_unlocked.spot, "music_enabled": music_enabled, "music_volume": music_volume}
+    var data = {"coins": coins, "stars": stars, "logic": level_unlocked.logic, "spot": level_unlocked.spot, "music_enabled": music_enabled, "music_volume": music_volume, "room_completed": room_completed}
     var f = FileAccess.open(save_path, FileAccess.WRITE)
     if f:
         f.store_string(JSON.stringify(data))
@@ -107,6 +111,7 @@ func _load_progress() -> void:
         level_unlocked.spot = int(parsed.get("spot", 1))
         music_enabled = bool(parsed.get("music_enabled", true))
         music_volume = clampf(float(parsed.get("music_volume", 0.35)), 0.0, 1.0)
+        room_completed = parsed.get("room_completed", {})
 
 func _clear() -> void:
     for child in get_children():
@@ -251,13 +256,133 @@ func _show_worlds(push := true) -> void:
     _clear()
     _header("اختر العالم")
     root.add_child(_label("اختر نوع التحدي الذي ترغب في خوضه", 19, MUTED))
-    root.add_child(_button("🧩  عالم الألغاز الذهنية\nمنطق • أرقام • ذاكرة • شفرات", func(): _show_levels("logic"), true))
+    root.add_child(_button("🧩  غرفة الألغاز الذهنية\nتحديات تفاعلية داخل الغرفة", func(): _show_puzzle_room(), true))
     root.add_child(_button("🔎  عالم اكتشاف الاختلافات\nصور واقعية • ملاحظة • تركيز", func(): _show_levels("spot"), true))
     root.add_child(_label("تقدمك محفوظ بشكل مستقل في كل عالم", 16, MUTED))
     var spacer = Control.new()
     spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
     root.add_child(spacer)
     root.add_child(_button("القائمة الرئيسية", _show_home))
+
+func _show_puzzle_room(push := true) -> void:
+    if push: _push("worlds")
+    _clear()
+    _header("غرفة الألغاز")
+    root.add_child(_label("أهلاً بك في غرفة التحديات", 25, GOLD))
+    root.add_child(_label("اختر محطة، حل اللغز داخل الغرفة، واجمع المكافآت لفتح أسرارها.", 16, MUTED))
+    var room_card := PanelContainer.new()
+    var room_style := StyleBoxFlat.new()
+    room_style.bg_color = Color("#10294b")
+    room_style.border_color = GOLD
+    room_style.set_border_width_all(2)
+    room_style.set_corner_radius_all(22)
+    room_card.add_theme_stylebox_override("panel", room_style)
+    var room_body := VBoxContainer.new()
+    room_body.add_theme_constant_override("separation", 10)
+    room_body.add_child(_label("🏛️  قاعة التحديات", 28, GOLD))
+    room_body.add_child(_label("🗝️        🔢        🔮        📜", 30))
+    room_body.add_child(_label("أربع محطات تنتظرك داخل الغرفة", 17, CREAM))
+    room_card.add_child(room_body)
+    root.add_child(room_card)
+    var stations := [
+        ["🔢  قفل الأرقام", "اكتشف الرمز السري المكوّن من رقمين", "code"],
+        ["🧩  لوحة المتتاليات", "اختر العدد الذي يكمل النمط", "sequence"],
+        ["🔮  ذاكرة الرموز", "أعد ترتيب الرموز كما ظهرت", "memory"],
+        ["📜  لغز الحارس", "حل سؤال الاستنتاج لفتح الصندوق", "riddle"]
+    ]
+    for station in stations:
+        var kind: String = station[2]
+        var done := bool(room_completed.get(kind, false))
+        var button := _button(("✓ " if done else "") + str(station[0]) + "\n" + str(station[1]), func(): _start_room_challenge(kind), not done)
+        button.disabled = done
+        root.add_child(button)
+    root.add_child(_label("المكتمل: %d / 4     ⭐ %d     🪙 %d" % [room_completed.size(), stars, coins], 17, GOLD))
+    root.add_child(_button("خريطة المراحل التقليدية", func(): _show_levels("logic"), false))
+    root.add_child(_button("العودة للعوالم", _show_worlds))
+
+func _start_room_challenge(kind: String) -> void:
+    room_challenge = kind
+    room_answer = ""
+    room_sequence_progress = 0
+    _show_room_challenge()
+
+func _show_room_challenge() -> void:
+    _clear()
+    _header("غرفة الألغاز")
+    match room_challenge:
+        "code":
+            root.add_child(_label("🔢 قفل الخزنة", 27, GOLD))
+            root.add_child(_label("أنا عدد من رقمين. مجموع رقميّ 9، ورقم العشرات أكبر من الآحاد بثلاثة. ما الرمز؟", 19))
+            root.add_child(_label("الرمز: " + room_answer, 24, GOLD))
+            var grid := GridContainer.new()
+            grid.columns = 3
+            for digit in range(1, 10):
+                var d := str(digit)
+                grid.add_child(_button(d, func(): _room_key(d)))
+            root.add_child(grid)
+            root.add_child(_button("مسح", func(): room_answer = ""; _show_room_challenge()))
+            root.add_child(_button("تحقق من الرمز", _check_room_code, true))
+        "sequence":
+            root.add_child(_label("🧩 لوحة المتتاليات", 27, GOLD))
+            root.add_child(_label("ما العدد التالي؟", 21))
+            root.add_child(_label("2   •   6   •   12   •   20   •   ؟", 30, GOLD))
+            for option in ["26", "28", "30", "32"]:
+                root.add_child(_button(option, func(): _finish_room_challenge(option == "30", "الفروق هي 4 ثم 6 ثم 8 ثم 10؛ لذلك العدد 30.")))
+        "memory":
+            root.add_child(_label("🔮 ذاكرة الرموز", 27, GOLD))
+            root.add_child(_label("تذكّر الترتيب التالي ثم اضغط الرموز بالترتيب نفسه:", 18))
+            root.add_child(_label("🌙  ⭐  🔑", 38, GOLD))
+            root.add_child(_label("اختيارك: %d / 3" % room_sequence_progress, 19, MUTED))
+            for symbol in ["⭐", "🔑", "🌙"]:
+                root.add_child(_button(symbol, func(): _room_memory_pick(symbol)))
+        "riddle":
+            root.add_child(_label("📜 لغز الحارس", 27, GOLD))
+            root.add_child(_label("شيء كلما أخذت منه كبر، فما هو؟", 21))
+            for option in ["الحفرة", "العمر", "الظل", "الكتاب"]:
+                root.add_child(_button(option, func(): _finish_room_challenge(option == "الحفرة", "كلما أزلت التراب من الحفرة اتسعت وكبرت.")))
+    root.add_child(_button("العودة إلى قاعة التحديات", _show_puzzle_room))
+
+func _room_key(digit: String) -> void:
+    if room_answer.length() < 2:
+        room_answer += digit
+        _show_room_challenge()
+
+func _check_room_code() -> void:
+    _finish_room_challenge(room_answer == "63", "مجموع 6 و3 يساوي 9، والفرق بينهما 3.")
+
+func _room_memory_pick(symbol: String) -> void:
+    var expected := ["🌙", "⭐", "🔑"]
+    if room_sequence_progress >= expected.size():
+        return
+    if symbol != expected[room_sequence_progress]:
+        room_sequence_progress = 0
+        _show_message("ليس هذا الترتيب. حاول تذكر الرموز من جديد.")
+        _show_room_challenge()
+        return
+    room_sequence_progress += 1
+    if room_sequence_progress == expected.size():
+        _finish_room_challenge(true, "ذاكرتك ممتازة! رتبت الرموز الثلاثة بشكل صحيح.")
+    else:
+        _show_room_challenge()
+
+func _finish_room_challenge(correct: bool, explanation: String) -> void:
+    if not correct:
+        _show_message("لم تُفتح المحطة بعد. حاول مرة أخرى!")
+        return
+    if bool(room_completed.get(room_challenge, false)):
+        _show_puzzle_room(false)
+        return
+    room_completed[room_challenge] = true
+    coins += 15
+    stars += 1
+    _save_progress()
+    _clear()
+    _header("تم حل اللغز!")
+    root.add_child(_label("🏆", 64, GOLD))
+    root.add_child(_label("أحسنت! فتحت المحطة", 27, GOLD))
+    root.add_child(_label(explanation, 20))
+    root.add_child(_label("مكافأتك: ⭐ نجمة واحدة و 🪙 15 عملة", 19, GOLD))
+    root.add_child(_button("العودة إلى الغرفة", _show_puzzle_room, true))
 
 func _show_levels(world: String, push := true) -> void:
     if push: _push("worlds")
