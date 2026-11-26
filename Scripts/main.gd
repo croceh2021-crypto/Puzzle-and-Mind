@@ -118,7 +118,6 @@ func _load_progress() -> void:
         music_enabled = bool(parsed.get("music_enabled", true))
         music_volume = clampf(float(parsed.get("music_volume", 0.35)), 0.0, 1.0)
         temple_unlocked = bool(parsed.get("temple_unlocked", false))
-        temple_relics = parsed.get("temple_relics", {})
         temple_completed = bool(parsed.get("temple_completed", false))
         var saved_logic_completed = parsed.get("logic_completed", {})
         logic_completed = saved_logic_completed if typeof(saved_logic_completed) == TYPE_DICTIONARY else {}
