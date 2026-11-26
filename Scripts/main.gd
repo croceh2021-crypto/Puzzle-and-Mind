@@ -269,72 +269,62 @@ func _show_worlds(push := true) -> void:
 func _show_puzzle_room(push := true) -> void:
     if push: _push("worlds")
     _clear()
-    _header("غرفة الألغاز")
-    root.add_child(_label("أهلاً بك في غرفة التحديات", 25, GOLD))
-    root.add_child(_label("اختر محطة، حل اللغز داخل الغرفة، واجمع المكافآت لفتح أسرارها.", 16, MUTED))
-    # مشهد بصري مرسوم بالكامل داخل Godot حتى يعمل دون ملفات صور إضافية.
-    var hall_visual := RoomHallVisual.new()
-    hall_visual.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.34, 230.0, 330.0))
-    hall_visual.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    root.add_child(hall_visual)
-
-    var room_card := PanelContainer.new()
-    var room_style := StyleBoxFlat.new()
-    room_style.bg_color = Color("#10294b")
-    room_style.border_color = GOLD
-    room_style.set_border_width_all(2)
-    room_style.set_corner_radius_all(22)
-    room_card.add_theme_stylebox_override("panel", room_style)
-    var room_body := VBoxContainer.new()
-    room_body.add_theme_constant_override("separation", 10)
-    room_body.add_child(_label("🏛️  قاعة الأسرار القديمة", 28, GOLD))
-    room_body.add_child(_label("أربعة أقفال تحرس صندوق الكنز. اختر أحدها وابدأ التحدي.", 17, CREAM))
-    room_body.add_child(_label("كل محطة مكتملة تضيء رمزاً في القاعة وتمنحك نجمة و15 عملة.", 15, MUTED))
-    room_card.add_child(room_body)
-    root.add_child(room_card)
-    root.add_child(_label("🔍 استكشف المكان واجمع الأدلة قبل مواجهة الأقفال", 19, GOLD))
-    var explore_grid := GridContainer.new()
-    explore_grid.columns = 2
-    explore_grid.add_theme_constant_override("h_separation", 8)
-    explore_grid.add_theme_constant_override("v_separation", 8)
-    root.add_child(explore_grid)
-    var clues := [
-        ["🕯️ تفقد المشعل", "clue_code", "نقش خلف المشعل: رمز القفل هو 6 ثم 3."],
-        ["📜 اقرأ الرقعة", "clue_sequence", "الرقعة تقول: الفروق تزداد بمقدار 2 كل مرة."],
-        ["🪞 افحص المرآة", "clue_memory", "انعكاس المرآة يريك الترتيب: 🌙 ثم ⭐ ثم 🔑."],
-        ["🗿 افحص تمثال الحارس", "clue_riddle", "الحارس يهمس: ما الذي يكبر كلما أزلت منه؟"]
-    ]
-    for clue in clues:
-        var clue_id: String = clue[1]
-        var found := bool(room_evidence.get(clue_id, false))
-        var clue_button := _button(("✓ " if found else "🔎 ") + str(clue[0]), func(): _discover_room_evidence(clue_id, str(clue[2])), not found)
-        clue_button.disabled = found
-        explore_grid.add_child(clue_button)
+    _header("استكشاف قاعة الأسرار")
+    root.add_child(_label("حرّك المستكشف بلمس الأرض، ثم المس الأثر عندما تقترب منه.", 16, MUTED))
+    var explore_view := RoomExploreView.new()
+    explore_view.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.43, 285.0, 390.0))
+    explore_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    explore_view.evidence_state = room_evidence.duplicate(true)
+    explore_view.completed_state = room_completed.duplicate(true)
+    explore_view.object_interacted.connect(_on_room_object_interacted)
+    root.add_child(explore_view)
+    root.add_child(_label("🕹️ المس مكاناً فارغاً للمشي. اقترب من المشعل أو الرقعة أو المرآة أو الحارس ثم المسه لفحصه.", 15, GOLD))
     root.add_child(_label("🧭 الأدلة المجموعة: %d / 4" % _room_evidence_count(), 17, MUTED))
     var stations := [
-        ["🔢  قفل الأرقام", "اكتشف الرمز السري المكوّن من رقمين", "code", "clue_code"],
-        ["🧩  لوحة المتتاليات", "اختر العدد الذي يكمل النمط", "sequence", "clue_sequence"],
-        ["🔮  ذاكرة الرموز", "أعد ترتيب الرموز كما ظهرت", "memory", "clue_memory"],
-        ["📜  لغز الحارس", "حل سؤال الاستنتاج لفتح الصندوق", "riddle", "clue_riddle"]
+        ["🔢 قفل الأرقام", "code", "clue_code"],
+        ["🧩 لوحة المتتاليات", "sequence", "clue_sequence"],
+        ["🔮 ذاكرة الرموز", "memory", "clue_memory"],
+        ["📜 لغز الحارس", "riddle", "clue_riddle"]
     ]
     for station in stations:
-        var kind: String = station[2]
-        var evidence_id: String = station[3]
+        var kind: String = station[1]
+        var evidence_id: String = station[2]
         var done := bool(room_completed.get(kind, false))
         var unlocked := bool(room_evidence.get(evidence_id, false))
-        var button_text := ("✓ " if done else ("🔓 " if unlocked else "🔒 ")) + str(station[0]) + "\n" + str(station[1])
-        var button := _button(button_text, func(): _start_room_challenge(kind), not done and unlocked)
-        button.disabled = done or not unlocked
-        root.add_child(button)
+        var b := _button(("✓ " if done else ("🔓 " if unlocked else "🔒 ")) + str(station[0]), func(): _start_room_challenge(kind), not done and unlocked)
+        b.disabled = done or not unlocked
+        root.add_child(b)
     var completed_count := 0
     for station_kind in ["code", "sequence", "memory", "riddle"]:
         if bool(room_completed.get(station_kind, false)):
             completed_count += 1
-    root.add_child(_label("تقدم فتح القاعة: %d / 4     ⭐ %d     🪙 %d" % [completed_count, stars, coins], 17, GOLD))
-    var treasure_note := "🎁 صندوق الكنز أصبح مفتوحاً!" if completed_count == 4 else "🔒 أكمل المحطات الأربع لفتح صندوق الكنز."
-    root.add_child(_label(treasure_note, 18, GOLD))
+    root.add_child(_label("تقدم القاعة: %d / 4     ⭐ %d     🪙 %d" % [completed_count, stars, coins], 17, GOLD))
+    root.add_child(_label("🎁 صندوق الكنز مفتوح!" if completed_count == 4 else "🔒 افتح المحطات الأربع للوصول إلى صندوق الكنز.", 18, GOLD))
     root.add_child(_button("خريطة المراحل التقليدية", func(): _show_levels("logic"), false))
     root.add_child(_button("العودة للعوالم", _show_worlds))
+
+func _on_room_object_interacted(object_id: String) -> void:
+    var evidence := {
+        "torch": ["clue_code", "نقش خلف المشعل: رمز القفل هو 6 ثم 3."],
+        "scroll": ["clue_sequence", "الرقعة تقول: الفروق تزداد بمقدار 2 كل مرة."],
+        "mirror": ["clue_memory", "انعكاس المرآة يريك الترتيب: 🌙 ثم ⭐ ثم 🔑."],
+        "guardian": ["clue_riddle", "الحارس يهمس: ما الذي يكبر كلما أزلت منه؟"]
+    }
+    if object_id == "chest":
+        if _room_evidence_count() == 4 and room_completed.size() >= 4:
+            _clear()
+            _header("كنز قاعة الأسرار")
+            root.add_child(_label("🏆", 72, GOLD))
+            root.add_child(_label("لقد فتحت صندوق الكنز!", 28, GOLD))
+            root.add_child(_label("أكملت الأدلة الأربعة وحللت جميع الأقفال. أحسنت أيها المستكشف!", 20))
+            root.add_child(_button("العودة إلى القاعة", _show_puzzle_room, true))
+        else:
+            _show_message("الصندوق مغلق. اجمع الأدلة الأربعة وافتح الأقفال أولاً.")
+        return
+    if not evidence.has(object_id):
+        return
+    var clue: Array = evidence[object_id]
+    _discover_room_evidence(str(clue[0]), str(clue[1]))
 
 func _room_evidence_count() -> int:
     var total := 0
@@ -866,3 +856,127 @@ class RoomHallVisual:
         draw_rect(Rect2(chest.position.x, chest.position.y, chest.size.x, chest.size.y * 0.30), Color("#d3a14d"), true)
         draw_rect(Rect2(w * 0.485, h * 0.90, w * 0.03, h * 0.05), Color("#f5d16f"), true)
         draw_rect(Rect2(2, 2, w - 4, h - 4), Color("#d3ad65"), false, 2.0)
+
+class RoomExploreView:
+    extends Control
+
+    signal object_interacted(object_id: String)
+
+    var evidence_state: Dictionary = {}
+    var completed_state: Dictionary = {}
+    var player := Vector2(0.50, 0.84)
+    var destination := Vector2(0.50, 0.84)
+    var move_speed := 0.72
+    var hint_text := "المس الأرض للتحرك"
+
+    const OBJECTS := {
+        "torch": Vector2(0.17, 0.43),
+        "scroll": Vector2(0.39, 0.43),
+        "mirror": Vector2(0.61, 0.43),
+        "guardian": Vector2(0.83, 0.43),
+        "chest": Vector2(0.50, 0.76)
+    }
+
+    func _ready() -> void:
+        mouse_filter = Control.MOUSE_FILTER_STOP
+        set_process(true)
+        queue_redraw()
+
+    func _process(delta: float) -> void:
+        var difference := destination - player
+        if difference.length() > 0.006:
+            player = player.move_toward(destination, move_speed * delta)
+            queue_redraw()
+
+    func _gui_input(event: InputEvent) -> void:
+        var point := Vector2(-1, -1)
+        if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+            point = event.position
+        elif event is InputEventScreenTouch and event.pressed:
+            point = event.position
+        if point.x < 0.0:
+            return
+        var local := Vector2(point.x / maxf(size.x, 1.0), point.y / maxf(size.y, 1.0))
+        local.x = clampf(local.x, 0.04, 0.96)
+        local.y = clampf(local.y, 0.16, 0.94)
+        var nearest_id := ""
+        var nearest_distance := 10.0
+        for object_id in OBJECTS:
+            var object_pos: Vector2 = OBJECTS[object_id]
+            var distance := local.distance_to(object_pos)
+            if distance < nearest_distance and distance < 0.105:
+                nearest_id = str(object_id)
+                nearest_distance = distance
+        if nearest_id != "":
+            var target: Vector2 = OBJECTS[nearest_id]
+            if player.distance_to(target) <= 0.145:
+                hint_text = "تفحص المكان..."
+                object_interacted.emit(nearest_id)
+            else:
+                destination = Vector2(target.x, minf(target.y + 0.13, 0.91))
+                hint_text = "أنت في طريقك إلى المكان... المسه عند الاقتراب"
+        else:
+            destination = local
+            hint_text = "تحرّك نحو الأثر ثم المسه لفحصه"
+        queue_redraw()
+        accept_event()
+
+    func _draw() -> void:
+        var w := size.x
+        var h := size.y
+        if w < 20.0 or h < 20.0:
+            return
+        draw_rect(Rect2(Vector2.ZERO, size), Color("#081326"), true)
+        draw_colored_polygon(PackedVector2Array([
+            Vector2(w * 0.08, h * 0.10), Vector2(w * 0.92, h * 0.10),
+            Vector2(w * 0.78, h * 0.72), Vector2(w * 0.22, h * 0.72)
+        ]), Color("#17375a"))
+        draw_colored_polygon(PackedVector2Array([
+            Vector2(0, h * 0.12), Vector2(w * 0.08, h * 0.10),
+            Vector2(w * 0.22, h * 0.72), Vector2(0, h)
+        ]), Color("#102744"))
+        draw_colored_polygon(PackedVector2Array([
+            Vector2(w, h * 0.12), Vector2(w * 0.92, h * 0.10),
+            Vector2(w * 0.78, h * 0.72), Vector2(w, h)
+        ]), Color("#102744"))
+        draw_colored_polygon(PackedVector2Array([
+            Vector2(0, h), Vector2(w, h), Vector2(w * 0.78, h * 0.72),
+            Vector2(w * 0.22, h * 0.72)
+        ]), Color("#142b45"))
+        for i in range(1, 6):
+            var t := float(i) / 6.0
+            var y := lerpf(h * 0.72, h * 0.98, t)
+            draw_line(Vector2(w * (0.22 - t * 0.18), y), Vector2(w * (0.78 + t * 0.18), y), Color("#34506a"), 1.2)
+        for i in range(1, 7):
+            draw_line(Vector2(w * 0.5, h * 0.72), Vector2(w * float(i) / 7.0, h), Color("#34506a"), 1.0)
+        draw_rect(Rect2(w * 0.39, h * 0.18, w * 0.22, h * 0.48), Color("#07101e"), true)
+        draw_rect(Rect2(w * 0.415, h * 0.22, w * 0.17, h * 0.44), Color("#6d4828"), true)
+        draw_arc(Vector2(w * 0.50, h * 0.27), w * 0.065, PI, TAU, 32, Color("#d6a64c"), 4.0)
+        for side in [0.16, 0.84]:
+            draw_rect(Rect2(w * (side - 0.025), h * 0.20, w * 0.05, h * 0.53), Color("#274866"), true)
+        _draw_object("torch", "🔥", "المشعل", w, h)
+        _draw_object("scroll", "📜", "الرقعة", w, h)
+        _draw_object("mirror", "🪞", "المرآة", w, h)
+        _draw_object("guardian", "🗿", "الحارس", w, h)
+        _draw_object("chest", "🎁", "الصندوق", w, h)
+        var px := player.x * w
+        var py := player.y * h
+        draw_circle(Vector2(px, py + 7), 12, Color(0, 0, 0, 0.35))
+        draw_circle(Vector2(px, py - 5), 11, Color("#f2bd4b"))
+        draw_circle(Vector2(px, py - 5), 7, Color("#17375a"))
+        draw_arc(Vector2(px, py - 5), 15, 0, TAU, 24, Color("#fff1cf"), 2.0)
+        draw_string(ThemeDB.fallback_font, Vector2(12, 23), hint_text, HORIZONTAL_ALIGNMENT_LEFT, w - 24, 14, Color("#fff1cf"))
+        draw_rect(Rect2(2, 2, w - 4, h - 4), Color("#d3ad65"), false, 2.0)
+
+    func _draw_object(object_id: String, symbol: String, caption: String, w: float, h: float) -> void:
+        var p: Vector2 = OBJECTS[object_id]
+        var center := Vector2(p.x * w, p.y * h)
+        var found := bool(evidence_state.get("clue_" + {"torch":"code", "scroll":"sequence", "mirror":"memory", "guardian":"riddle"}.get(object_id, ""), false))
+        var done := bool(completed_state.get({"torch":"code", "scroll":"sequence", "mirror":"memory", "guardian":"riddle"}.get(object_id, ""), false))
+        var glow := Color("#39b879") if found or done else Color("#f2bd4b")
+        draw_circle(center, 24, Color(glow.r, glow.g, glow.b, 0.18))
+        draw_circle(center, 17, Color("#10294b"))
+        draw_arc(center, 19, 0, TAU, 28, glow, 2.0)
+        draw_string(ThemeDB.fallback_font, center + Vector2(-12, 6), symbol, HORIZONTAL_ALIGNMENT_LEFT, 28, 19, Color("#fff1cf"))
+        draw_string(ThemeDB.fallback_font, center + Vector2(-35, 37), caption + (" ✓" if found or done else ""), HORIZONTAL_ALIGNMENT_CENTER, 70, 12, Color("#fff1cf"))
+
