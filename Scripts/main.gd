@@ -24,6 +24,9 @@ var room_answer := ""
 var room_sequence_progress := 0
 var room_completed := {}
 var room_evidence := {}
+var temple_unlocked := false
+var temple_relics := {}
+var temple_completed := false
 var level_unlocked := {"logic": 1, "spot": 1}
 var save_path := "user://puzzle_mind_save.json"
 var root: Control
@@ -93,7 +96,7 @@ func _on_music_volume_changed(value: float) -> void:
     _save_progress()
 
 func _save_progress() -> void:
-    var data = {"coins": coins, "stars": stars, "logic": level_unlocked.logic, "spot": level_unlocked.spot, "music_enabled": music_enabled, "music_volume": music_volume, "room_completed": room_completed, "room_evidence": room_evidence}
+    var data = {"coins": coins, "stars": stars, "logic": level_unlocked.logic, "spot": level_unlocked.spot, "music_enabled": music_enabled, "music_volume": music_volume, "room_completed": room_completed, "room_evidence": room_evidence, "temple_unlocked": temple_unlocked, "temple_relics": temple_relics, "temple_completed": temple_completed}
     var f = FileAccess.open(save_path, FileAccess.WRITE)
     if f:
         f.store_string(JSON.stringify(data))
@@ -114,6 +117,9 @@ func _load_progress() -> void:
         music_volume = clampf(float(parsed.get("music_volume", 0.35)), 0.0, 1.0)
         room_completed = parsed.get("room_completed", {})
         room_evidence = parsed.get("room_evidence", {})
+        temple_unlocked = bool(parsed.get("temple_unlocked", false))
+        temple_relics = parsed.get("temple_relics", {})
+        temple_completed = bool(parsed.get("temple_completed", false))
 
 func _clear() -> void:
     for child in get_children():
@@ -313,12 +319,17 @@ func _on_room_object_interacted(object_id: String) -> void:
     }
     if object_id == "chest":
         if _room_evidence_count() == 4 and _room_completed_count() == 4:
+            temple_unlocked = true
+            _save_progress()
             _clear()
             _header("كنز قاعة الأسرار")
-            root.add_child(_label("🏆", 72, GOLD))
-            root.add_child(_label("لقد فتحت صندوق الكنز!", 28, GOLD))
-            root.add_child(_label("أكملت الأدلة الأربعة وحللت جميع الأقفال. أحسنت أيها المستكشف!", 20))
-            root.add_child(_button("العودة إلى القاعة", _show_puzzle_room, true))
+            var portal_fx := TemplePortalVisual.new()
+            portal_fx.custom_minimum_size = Vector2(0, 190)
+            root.add_child(portal_fx)
+            root.add_child(_label("🏆 لقد فتحت صندوق الكنز!", 28, GOLD))
+            root.add_child(_label("من بين الكنوز ظهر ممر مضيء يقود إلى المعبد القديم. مغامرتك لم تنتهِ بعد!", 20))
+            root.add_child(_button("✨ الانتقال إلى المعبد القديم", _show_temple_room, true))
+            root.add_child(_button("العودة إلى القاعة", _show_puzzle_room, false))
         else:
             _show_message("الصندوق مغلق. اجمع الأدلة الأربعة وافتح الأقفال أولاً.")
         return
@@ -326,6 +337,70 @@ func _on_room_object_interacted(object_id: String) -> void:
         return
     var clue: Array = evidence[object_id]
     _discover_room_evidence(str(clue[0]), str(clue[1]))
+
+func _show_temple_room(push := true) -> void:
+    if not temple_unlocked:
+        _show_message("افتح كنز قاعة الأسرار أولاً للوصول إلى المعبد القديم.")
+        return
+    if push: _push("worlds")
+    _clear()
+    _header("المعبد القديم")
+    root.add_child(_label("منحوتات غامضة وثلاثة أختام تحرس بوابة المعبد.", 16, MUTED))
+    var temple_view := TempleExploreView.new()
+    temple_view.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.43, 285.0, 390.0))
+    temple_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    temple_view.relic_state = temple_relics.duplicate(true)
+    temple_view.gate_open = temple_completed
+    temple_view.object_interacted.connect(_on_temple_object_interacted)
+    root.add_child(temple_view)
+    root.add_child(_label("المس الأرض للتحرك، واقترب من الأختام الثلاثة ثم افحص بوابة المعبد.", 15, GOLD))
+    root.add_child(_label("الأختام المكتشفة: %d / 3" % _temple_relic_count(), 17, MUTED))
+    root.add_child(_button("العودة إلى قاعة الأسرار", _show_puzzle_room, false))
+
+func _temple_relic_count() -> int:
+    var total := 0
+    for key in ["sun", "moon", "eye"]:
+        if bool(temple_relics.get(key, false)):
+            total += 1
+    return total
+
+func _on_temple_object_interacted(object_id: String) -> void:
+    var relics := {
+        "sun": "ختم الشمس: يرمز إلى بداية النهار والنور.",
+        "moon": "ختم القمر: لا يظهر نوره إلا في الظلام.",
+        "eye": "ختم العين: يراقب الطريق إلى قلب المعبد."
+    }
+    if object_id == "gate":
+        if _temple_relic_count() == 3:
+            temple_completed = true
+            _save_progress()
+            _clear()
+            _header("بوابة المعبد")
+            var portal_fx := TemplePortalVisual.new()
+            portal_fx.custom_minimum_size = Vector2(0, 210)
+            root.add_child(portal_fx)
+            root.add_child(_label("🌟 لقد فتحت بوابة المعبد القديم!", 27, GOLD))
+            root.add_child(_label("جمعت الأختام الثلاثة وأيقظت البوابة. لقد أصبحت المنطقة الثانية مكتملة!", 19))
+            root.add_child(_button("العودة إلى المعبد", _show_temple_room, true))
+        else:
+            _show_message("البوابة لا تستجيب. ابحث عن أختام الشمس والقمر والعين الثلاثة.")
+        return
+    if not relics.has(object_id):
+        return
+    if bool(temple_relics.get(object_id, false)):
+        _show_message("هذا الختم محفوظ في سجل مغامرتك.")
+        return
+    temple_relics[object_id] = true
+    _save_progress()
+    _clear()
+    _header("اكتشاف ختم أثري")
+    var fx := RoomRewardVisual.new()
+    fx.custom_minimum_size = Vector2(0, 150)
+    root.add_child(fx)
+    root.add_child(_label("✨ اكتشفت ختماً جديداً!", 28, GOLD))
+    root.add_child(_label(relics[object_id], 20))
+    root.add_child(_label("حُفظ تقدمك ويمكنك متابعة الاستكشاف.", 16, MUTED))
+    root.add_child(_button("متابعة المعبد", _show_temple_room, true))
 
 func _room_completed_count() -> int:
     var total := 0
@@ -1057,6 +1132,135 @@ class RoomExploreView:
             else:
                 draw_rect(Rect2(center.x - 18, center.y - 8, 36, 20), Color("#9b642d"), true)
                 draw_rect(Rect2(center.x - 18, center.y - 8, 36, 7), Color("#d3a14d"), true)
+
+class TempleExploreView:
+    extends Control
+
+    signal object_interacted(object_id: String)
+
+    var relic_state: Dictionary = {}
+    var gate_open := false
+    var player := Vector2(0.50, 0.86)
+    var destination := Vector2(0.50, 0.86)
+    var pending_object := ""
+    var walk_time := 0.0
+    var facing := 1.0
+    var hint := "المس الأرض للتحرك"
+    var pulse := 0.0
+
+    const OBJECTS := {
+        "sun": Vector2(0.20, 0.46),
+        "moon": Vector2(0.50, 0.38),
+        "eye": Vector2(0.80, 0.46),
+        "gate": Vector2(0.50, 0.72)
+    }
+
+    func _ready() -> void:
+        mouse_filter = Control.MOUSE_FILTER_STOP
+        set_process(true)
+        queue_redraw()
+
+    func _process(delta: float) -> void:
+        var diff := destination - player
+        if diff.length() > 0.006:
+            if absf(diff.x) > 0.01:
+                facing = signf(diff.x)
+            player = player.move_toward(destination, 0.72 * delta)
+            walk_time += delta * 10.0
+            if pending_object != "" and player.distance_to(_approach(pending_object)) <= 0.035:
+                var reached := pending_object
+                pending_object = ""
+                object_interacted.emit(reached)
+        else:
+            walk_time = move_toward(walk_time, 0.0, delta * 8.0)
+        pulse += delta
+        queue_redraw()
+
+    func _approach(id: String) -> Vector2:
+        var p: Vector2 = OBJECTS[id]
+        return Vector2(p.x, minf(p.y + 0.13, 0.92))
+
+    func _gui_input(event: InputEvent) -> void:
+        var point := Vector2(-1, -1)
+        if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+            point = event.position
+        elif event is InputEventScreenTouch and event.pressed:
+            point = event.position
+        if point.x < 0.0:
+            return
+        var local := Vector2(clampf(point.x / maxf(size.x, 1.0), 0.04, 0.96), clampf(point.y / maxf(size.y, 1.0), 0.15, 0.95))
+        var nearest := ""
+        var nearest_d := 10.0
+        for id in OBJECTS:
+            var d := local.distance_to(OBJECTS[id])
+            if d < nearest_d and d < 0.11:
+                nearest = str(id)
+                nearest_d = d
+        if nearest != "":
+            if player.distance_to(OBJECTS[nearest]) <= 0.16:
+                pending_object = ""
+                object_interacted.emit(nearest)
+            else:
+                pending_object = nearest
+                destination = _approach(nearest)
+                hint = "يتجه المستكشف إلى النقش..."
+        else:
+            pending_object = ""
+            destination = local
+            hint = "تحرّك نحو النقش أو البوابة"
+        queue_redraw()
+        accept_event()
+
+    func _draw() -> void:
+        var w := size.x
+        var h := size.y
+        if w < 20.0 or h < 20.0:
+            return
+        draw_rect(Rect2(Vector2.ZERO, size), Color("#100d20"), true)
+        draw_colored_polygon(PackedVector2Array([
+            Vector2(0, h * 0.12), Vector2(w, h * 0.12),
+            Vector2(w * 0.82, h * 0.72), Vector2(w * 0.18, h * 0.72)
+        ]), Color("#392b48"))
+        draw_colored_polygon(PackedVector2Array([
+            Vector2(0, h), Vector2(w, h), Vector2(w * 0.82, h * 0.72), Vector2(w * 0.18, h * 0.72)
+        ]), Color("#241d35"))
+        for i in range(7):
+            var x := w * (0.08 + float(i) * 0.14)
+            draw_rect(Rect2(x, h * 0.14, w * 0.035, h * 0.52), Color("#59415a"), true)
+            draw_line(Vector2(x, h * 0.14), Vector2(x + w * 0.018, h * 0.10), Color("#b58a63"), 3.0)
+        for i in range(1, 6):
+            var t := float(i) / 6.0
+            draw_line(Vector2(w * (0.18 - t * 0.18), h * (0.72 + t * 0.27)), Vector2(w * (0.82 + t * 0.18), h * (0.72 + t * 0.27)), Color("#59415a"), 1.2)
+        var gate_center := Vector2(w * 0.50, h * 0.72)
+        draw_rect(Rect2(w * 0.39, h * 0.18, w * 0.22, h * 0.54), Color("#171222"), true)
+        draw_arc(Vector2(w * 0.50, h * 0.29), w * 0.11, PI, TAU, 40, Color("#bd8c54"), 5.0)
+        draw_arc(gate_center, 35.0 + sin(pulse * 2.0) * 4.0, 0, TAU, 40, Color("#e7b85c") if gate_open else Color("#77628c"), 3.0)
+        if gate_open:
+            draw_rect(Rect2(w * 0.425, h * 0.28, w * 0.15, h * 0.42), Color(0.35, 0.72, 0.95, 0.25), true)
+        _draw_relic("sun", "☀", "الشمس", w, h)
+        _draw_relic("moon", "☾", "القمر", w, h)
+        _draw_relic("eye", "◉", "العين", w, h)
+        _draw_relic("gate", "🚪", "البوابة", w, h)
+        var c := Vector2(player.x * w, player.y * h + sin(walk_time) * 2.0)
+        draw_circle(c + Vector2(0, 15), 9, Color(0, 0, 0, 0.35))
+        draw_line(c + Vector2(-4, 7), c + Vector2(-6 + sin(walk_time) * 4, 22), Color("#263b58"), 5.0)
+        draw_line(c + Vector2(4, 7), c + Vector2(6 - sin(walk_time) * 4, 22), Color("#263b58"), 5.0)
+        draw_colored_polygon(PackedVector2Array([c + Vector2(-8, -7), c + Vector2(8, -7), c + Vector2(7, 10), c + Vector2(-7, 10)]), Color("#b58b58"))
+        draw_circle(c + Vector2(0, -15), 7, Color("#edbd8c"))
+        draw_arc(c + Vector2(0, -15), 7, PI, TAU, 16, Color("#37263b"), 3.0)
+        draw_string(ThemeDB.fallback_font, Vector2(12, 23), hint, HORIZONTAL_ALIGNMENT_LEFT, w - 24, 14, Color("#fff1cf"))
+        draw_rect(Rect2(2, 2, w - 4, h - 4), Color("#a77a56"), false, 2.0)
+
+    func _draw_relic(id: String, symbol: String, label: String, w: float, h: float) -> void:
+        var p: Vector2 = OBJECTS[id]
+        var center := Vector2(p.x * w, p.y * h)
+        var found := bool(relic_state.get(id, false))
+        var color := Color("#4dd49b") if found else Color("#e6b65c")
+        draw_circle(center, 25.0 + sin(pulse * 2.0) * 2.0, Color(color.r, color.g, color.b, 0.15))
+        draw_circle(center, 17, Color("#261d37"))
+        draw_arc(center, 20, 0, TAU, 28, color, 2.0)
+        draw_string(ThemeDB.fallback_font, center + Vector2(-12, 7), symbol, HORIZONTAL_ALIGNMENT_LEFT, 28, 21, Color("#fff1cf"))
+        draw_string(ThemeDB.fallback_font, center + Vector2(-32, 39), label + (" ✓" if found else ""), HORIZONTAL_ALIGNMENT_CENTER, 64, 12, Color("#fff1cf"))
 
 class RoomRewardVisual:
     extends Control
