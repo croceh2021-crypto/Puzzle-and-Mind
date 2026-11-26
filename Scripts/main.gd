@@ -27,6 +27,8 @@ var room_evidence := {}
 var temple_unlocked := false
 var temple_relics := {}
 var temple_completed := false
+var logic_completed := {}
+var spot_completed := {}
 var level_unlocked := {"logic": 1, "spot": 1}
 var save_path := "user://puzzle_mind_save.json"
 var root: Control
@@ -96,7 +98,7 @@ func _on_music_volume_changed(value: float) -> void:
     _save_progress()
 
 func _save_progress() -> void:
-    var data = {"coins": coins, "stars": stars, "logic": level_unlocked.logic, "spot": level_unlocked.spot, "music_enabled": music_enabled, "music_volume": music_volume, "room_completed": room_completed, "room_evidence": room_evidence, "temple_unlocked": temple_unlocked, "temple_relics": temple_relics, "temple_completed": temple_completed}
+    var data = {"coins": coins, "stars": stars, "logic": level_unlocked.logic, "spot": level_unlocked.spot, "music_enabled": music_enabled, "music_volume": music_volume, "room_completed": room_completed, "room_evidence": room_evidence, "temple_unlocked": temple_unlocked, "temple_relics": temple_relics, "temple_completed": temple_completed, "logic_completed": logic_completed, "spot_completed": spot_completed}
     var f = FileAccess.open(save_path, FileAccess.WRITE)
     if f:
         f.store_string(JSON.stringify(data))
@@ -115,11 +117,19 @@ func _load_progress() -> void:
         level_unlocked.spot = int(parsed.get("spot", 1))
         music_enabled = bool(parsed.get("music_enabled", true))
         music_volume = clampf(float(parsed.get("music_volume", 0.35)), 0.0, 1.0)
-        room_completed = parsed.get("room_completed", {})
-        room_evidence = parsed.get("room_evidence", {})
         temple_unlocked = bool(parsed.get("temple_unlocked", false))
         temple_relics = parsed.get("temple_relics", {})
         temple_completed = bool(parsed.get("temple_completed", false))
+        var saved_logic_completed = parsed.get("logic_completed", {})
+        logic_completed = saved_logic_completed if typeof(saved_logic_completed) == TYPE_DICTIONARY else {}
+        var saved_spot_completed = parsed.get("spot_completed", {})
+        spot_completed = saved_spot_completed if typeof(saved_spot_completed) == TYPE_DICTIONARY else {}
+        var saved_room_completed = parsed.get("room_completed", {})
+        room_completed = saved_room_completed if typeof(saved_room_completed) == TYPE_DICTIONARY else {}
+        var saved_room_evidence = parsed.get("room_evidence", {})
+        room_evidence = saved_room_evidence if typeof(saved_room_evidence) == TYPE_DICTIONARY else {}
+        var saved_temple_relics = parsed.get("temple_relics", {})
+        temple_relics = saved_temple_relics if typeof(saved_temple_relics) == TYPE_DICTIONARY else {}
 
 func _clear() -> void:
     for child in get_children():
@@ -427,7 +437,7 @@ func _answer_temple_trial(relic_id: String, answer: String) -> void:
             correct = "الإبرة"
             description = "ختم العين: عرفت أن عين الإبرة لا ترى."
     if answer != correct:
-        _show_temple_trial_feedback(relic_id, false)
+        _show_temple_trial_feedback(relic_id)
         return
     temple_relics[relic_id] = true
     _save_progress()
@@ -441,7 +451,7 @@ func _answer_temple_trial(relic_id: String, answer: String) -> void:
     root.add_child(_label("الأختام المكتشفة: %d / 3" % _temple_relic_count(), 17, MUTED))
     root.add_child(_button("متابعة استكشاف المعبد", _show_temple_room, true))
 
-func _show_temple_trial_feedback(relic_id: String, _unused: bool) -> void:
+func _show_temple_trial_feedback(relic_id: String) -> void:
     _clear()
     _header("حاول مرة أخرى")
     root.add_child(_label("ليست هذه الإجابة الصحيحة. فكّر في اللغز وحاول مجدداً.", 21, GOLD))
@@ -639,11 +649,21 @@ func _show_logic() -> void:
 
 func _check_logic(choice: int) -> void:
     if choice == int(current_puzzle.correct):
-        coins += 10
-        stars += 1
+        stage_completed = true
+        var completion_key := str(current_level)
+        var first_completion := not bool(logic_completed.get(completion_key, false))
+        if first_completion:
+            logic_completed[completion_key] = true
+            coins += 10
+            stars += 1
         level_unlocked.logic = max(int(level_unlocked.logic), current_level + 1)
         _save_progress()
-        _show_result(true, str(current_puzzle.explanation))
+        var detail := str(current_puzzle.explanation)
+        if first_completion:
+            detail += "\nمكافأتك: 10 عملات ونجمة واحدة."
+        else:
+            detail += "\nهذه المرحلة مكتملة سابقاً؛ لم تُكرر المكافأة."
+        _show_result(true, detail)
     else:
         _show_message("ليست الإجابة الصحيحة. حاول مرة أخرى!")
 
@@ -722,11 +742,20 @@ func _on_difference_found(total: int) -> void:
         feedback_label.text = "الاختلافات: %d / 7" % total
     if total >= 7 and not stage_completed:
         stage_completed = true
-        coins += 10
-        stars += 1
+        var completion_key := str(current_level)
+        var first_completion := not bool(spot_completed.get(completion_key, false))
+        if first_completion:
+            spot_completed[completion_key] = true
+            coins += 10
+            stars += 1
         level_unlocked.spot = max(int(level_unlocked.spot), current_level + 1)
         _save_progress()
-        _show_result(true, "أحسنت! اكتشفت الاختلافات السبعة.")
+        var detail := "أحسنت! اكتشفت الاختلافات السبعة."
+        if first_completion:
+            detail += "\nمكافأتك: 10 عملات ونجمة واحدة."
+        else:
+            detail += "\nهذه المرحلة مكتملة سابقاً؛ لم تُكرر المكافأة."
+        _show_result(true, detail)
 
 func _show_result(won: bool, detail: String) -> void:
     _clear()
@@ -767,6 +796,7 @@ func _show_result(won: bool, detail: String) -> void:
 func _show_message(message: String) -> void:
     var dialog = AcceptDialog.new()
     dialog.dialog_text = message
+    dialog.confirmed.connect(dialog.queue_free)
     add_child(dialog)
     dialog.popup_centered()
 
@@ -872,24 +902,35 @@ class PhotoSpotPuzzle:
                 draw_circle(p, 8.0, Color("#ffffff"))
 
     func _gui_input(event: InputEvent) -> void:
+        var touch_position := Vector2(-1.0, -1.0)
         if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-            var bottom_rect := _photo_rect(1, photo_b)
-            if not bottom_rect.has_point(event.position):
-                return
-            var local: Vector2 = (event.position - bottom_rect.position) / bottom_rect.size
-            var total := 0
-            for i in range(difference_points.size()):
-                if hit[i]:
-                    total += 1
-                    continue
-                var target: Vector2 = difference_points[i] * bottom_rect.size
-                var radius := float(difference_radii[i]) if i < difference_radii.size() else 0.035
-                if (local * bottom_rect.size).distance_to(target) <= max(16.0, bottom_rect.size.x * radius):
-                    hit[i] = true
-                    total += 1
-            if total > 0:
-                queue_redraw()
-                found.emit(total)
+            touch_position = event.position
+        elif event is InputEventScreenTouch and event.pressed:
+            touch_position = event.position
+        else:
+            return
+        if photo_b == null:
+            return
+        var bottom_rect := _photo_rect(1, photo_b)
+        if bottom_rect.size.x <= 0.0 or bottom_rect.size.y <= 0.0:
+            return
+        if not bottom_rect.has_point(touch_position):
+            return
+        var local: Vector2 = (touch_position - bottom_rect.position) / bottom_rect.size
+        var total := 0
+        for i in range(difference_points.size()):
+            if hit[i]:
+                total += 1
+                continue
+            var target: Vector2 = difference_points[i] * bottom_rect.size
+            var radius := float(difference_radii[i]) if i < difference_radii.size() else 0.035
+            if (local * bottom_rect.size).distance_to(target) <= maxf(16.0, bottom_rect.size.x * radius):
+                hit[i] = true
+                total += 1
+        if total > 0:
+            queue_redraw()
+            found.emit(total)
+        accept_event()
 
 
 class ScreenBackdrop:
