@@ -15,6 +15,7 @@ on:
       - 'project.godot'
       - 'export_presets.cfg'
       - '.github/workflows/godot-check.yml'
+      - '.github/scripts/**'
   pull_request:
     branches: [main]
     paths:
@@ -25,6 +26,7 @@ on:
       - 'project.godot'
       - 'export_presets.cfg'
       - '.github/workflows/godot-check.yml'
+      - '.github/scripts/**'
   workflow_dispatch:
 
 jobs:
