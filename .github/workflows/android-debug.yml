@@ -197,11 +197,11 @@ jobs:
       - name: Install and test game in Pixel emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          api-level: 30
           target: default
-          arch: x86_64
+          arch: x86
           profile: pixel_2
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics -memory 2048 -cores 2
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -no-metrics -memory 4096 -cores 4
           disable-animations: false
           script: bash .github/scripts/android-emulator-puzzle.sh
 
