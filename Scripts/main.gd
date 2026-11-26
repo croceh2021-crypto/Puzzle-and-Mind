@@ -611,6 +611,7 @@ func _read_puzzles() -> Array:
 func _start_logic(level: int) -> void:
     active_world = "logic"
     stage_completed = false
+    hints_left = 3
     var puzzles = _read_puzzles()
     if puzzles.is_empty():
         _show_message("تعذر تحميل الألغاز")
@@ -675,6 +676,7 @@ func _show_hint() -> void:
 
 func _start_spot(level: int) -> void:
     active_world = "spot"
+    hints_left = 3
     if level < 1 or level > 25:
         _show_message("هذه المرحلة غير متاحة حالياً.")
         return
