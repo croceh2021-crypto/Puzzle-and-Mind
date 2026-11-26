@@ -23,6 +23,7 @@ var room_challenge := ""
 var room_answer := ""
 var room_sequence_progress := 0
 var room_completed := {}
+var room_evidence := {}
 var level_unlocked := {"logic": 1, "spot": 1}
 var save_path := "user://puzzle_mind_save.json"
 var root: Control
@@ -92,7 +93,7 @@ func _on_music_volume_changed(value: float) -> void:
     _save_progress()
 
 func _save_progress() -> void:
-    var data = {"coins": coins, "stars": stars, "logic": level_unlocked.logic, "spot": level_unlocked.spot, "music_enabled": music_enabled, "music_volume": music_volume, "room_completed": room_completed}
+    var data = {"coins": coins, "stars": stars, "logic": level_unlocked.logic, "spot": level_unlocked.spot, "music_enabled": music_enabled, "music_volume": music_volume, "room_completed": room_completed, "room_evidence": room_evidence}
     var f = FileAccess.open(save_path, FileAccess.WRITE)
     if f:
         f.store_string(JSON.stringify(data))
@@ -112,6 +113,7 @@ func _load_progress() -> void:
         music_enabled = bool(parsed.get("music_enabled", true))
         music_volume = clampf(float(parsed.get("music_volume", 0.35)), 0.0, 1.0)
         room_completed = parsed.get("room_completed", {})
+        room_evidence = parsed.get("room_evidence", {})
 
 func _clear() -> void:
     for child in get_children():
@@ -290,17 +292,39 @@ func _show_puzzle_room(push := true) -> void:
     room_body.add_child(_label("كل محطة مكتملة تضيء رمزاً في القاعة وتمنحك نجمة و15 عملة.", 15, MUTED))
     room_card.add_child(room_body)
     root.add_child(room_card)
+    root.add_child(_label("🔍 استكشف المكان واجمع الأدلة قبل مواجهة الأقفال", 19, GOLD))
+    var explore_grid := GridContainer.new()
+    explore_grid.columns = 2
+    explore_grid.add_theme_constant_override("h_separation", 8)
+    explore_grid.add_theme_constant_override("v_separation", 8)
+    root.add_child(explore_grid)
+    var clues := [
+        ["🕯️ تفقد المشعل", "clue_code", "نقش خلف المشعل: رمز القفل هو 6 ثم 3."],
+        ["📜 اقرأ الرقعة", "clue_sequence", "الرقعة تقول: الفروق تزداد بمقدار 2 كل مرة."],
+        ["🪞 افحص المرآة", "clue_memory", "انعكاس المرآة يريك الترتيب: 🌙 ثم ⭐ ثم 🔑."],
+        ["🗿 افحص تمثال الحارس", "clue_riddle", "الحارس يهمس: ما الذي يكبر كلما أزلت منه؟"]
+    ]
+    for clue in clues:
+        var clue_id: String = clue[1]
+        var found := bool(room_evidence.get(clue_id, false))
+        var clue_button := _button(("✓ " if found else "🔎 ") + str(clue[0]), func(): _discover_room_evidence(clue_id, str(clue[2])), not found)
+        clue_button.disabled = found
+        explore_grid.add_child(clue_button)
+    root.add_child(_label("🧭 الأدلة المجموعة: %d / 4" % _room_evidence_count(), 17, MUTED))
     var stations := [
-        ["🔢  قفل الأرقام", "اكتشف الرمز السري المكوّن من رقمين", "code"],
-        ["🧩  لوحة المتتاليات", "اختر العدد الذي يكمل النمط", "sequence"],
-        ["🔮  ذاكرة الرموز", "أعد ترتيب الرموز كما ظهرت", "memory"],
-        ["📜  لغز الحارس", "حل سؤال الاستنتاج لفتح الصندوق", "riddle"]
+        ["🔢  قفل الأرقام", "اكتشف الرمز السري المكوّن من رقمين", "code", "clue_code"],
+        ["🧩  لوحة المتتاليات", "اختر العدد الذي يكمل النمط", "sequence", "clue_sequence"],
+        ["🔮  ذاكرة الرموز", "أعد ترتيب الرموز كما ظهرت", "memory", "clue_memory"],
+        ["📜  لغز الحارس", "حل سؤال الاستنتاج لفتح الصندوق", "riddle", "clue_riddle"]
     ]
     for station in stations:
         var kind: String = station[2]
+        var evidence_id: String = station[3]
         var done := bool(room_completed.get(kind, false))
-        var button := _button(("✓ " if done else "") + str(station[0]) + "\n" + str(station[1]), func(): _start_room_challenge(kind), not done)
-        button.disabled = done
+        var unlocked := bool(room_evidence.get(evidence_id, false))
+        var button_text := ("✓ " if done else ("🔓 " if unlocked else "🔒 ")) + str(station[0]) + "\n" + str(station[1])
+        var button := _button(button_text, func(): _start_room_challenge(kind), not done and unlocked)
+        button.disabled = done or not unlocked
         root.add_child(button)
     var completed_count := 0
     for station_kind in ["code", "sequence", "memory", "riddle"]:
@@ -312,6 +336,25 @@ func _show_puzzle_room(push := true) -> void:
     root.add_child(_button("خريطة المراحل التقليدية", func(): _show_levels("logic"), false))
     root.add_child(_button("العودة للعوالم", _show_worlds))
 
+func _room_evidence_count() -> int:
+    var total := 0
+    for key in ["clue_code", "clue_sequence", "clue_memory", "clue_riddle"]:
+        if bool(room_evidence.get(key, false)):
+            total += 1
+    return total
+
+func _discover_room_evidence(clue_id: String, description: String) -> void:
+    if bool(room_evidence.get(clue_id, false)):
+        return
+    room_evidence[clue_id] = true
+    _save_progress()
+    _clear()
+    _header("اكتشاف دليل")
+    root.add_child(_label("✨ عثرت على دليل مخفي!", 30, GOLD))
+    root.add_child(_label(description, 22, CREAM))
+    root.add_child(_label("تم حفظ هذا الدليل، ويمكنك العودة إليه من سجل الأدلة.", 16, MUTED))
+    root.add_child(_button("متابعة الاستكشاف", _show_puzzle_room, true))
+
 func _start_room_challenge(kind: String) -> void:
     room_challenge = kind
     room_answer = ""
@@ -321,6 +364,13 @@ func _start_room_challenge(kind: String) -> void:
 func _show_room_challenge() -> void:
     _clear()
     _header("غرفة الألغاز")
+    var clue_text := ""
+    match room_challenge:
+        "code": clue_text = "الدليل: الرمز 6 ثم 3."
+        "sequence": clue_text = "الدليل: الفروق تزداد بمقدار 2."
+        "memory": clue_text = "الدليل: 🌙 ثم ⭐ ثم 🔑."
+        "riddle": clue_text = "الدليل: فكّر فيما يكبر عند إزالة جزء منه."
+    root.add_child(_label(clue_text, 16, GOLD))
     match room_challenge:
         "code":
             root.add_child(_label("🔢 قفل الخزنة", 27, GOLD))
