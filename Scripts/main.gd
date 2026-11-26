@@ -270,6 +270,12 @@ func _show_puzzle_room(push := true) -> void:
     _header("غرفة الألغاز")
     root.add_child(_label("أهلاً بك في غرفة التحديات", 25, GOLD))
     root.add_child(_label("اختر محطة، حل اللغز داخل الغرفة، واجمع المكافآت لفتح أسرارها.", 16, MUTED))
+    # مشهد بصري مرسوم بالكامل داخل Godot حتى يعمل دون ملفات صور إضافية.
+    var hall_visual := RoomHallVisual.new()
+    hall_visual.custom_minimum_size = Vector2(0, clampf(get_viewport_rect().size.y * 0.34, 230.0, 330.0))
+    hall_visual.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    root.add_child(hall_visual)
+
     var room_card := PanelContainer.new()
     var room_style := StyleBoxFlat.new()
     room_style.bg_color = Color("#10294b")
@@ -279,9 +285,9 @@ func _show_puzzle_room(push := true) -> void:
     room_card.add_theme_stylebox_override("panel", room_style)
     var room_body := VBoxContainer.new()
     room_body.add_theme_constant_override("separation", 10)
-    room_body.add_child(_label("🏛️  قاعة التحديات", 28, GOLD))
-    room_body.add_child(_label("🗝️        🔢        🔮        📜", 30))
-    room_body.add_child(_label("أربع محطات تنتظرك داخل الغرفة", 17, CREAM))
+    room_body.add_child(_label("🏛️  قاعة الأسرار القديمة", 28, GOLD))
+    room_body.add_child(_label("أربعة أقفال تحرس صندوق الكنز. اختر أحدها وابدأ التحدي.", 17, CREAM))
+    room_body.add_child(_label("كل محطة مكتملة تضيء رمزاً في القاعة وتمنحك نجمة و15 عملة.", 15, MUTED))
     room_card.add_child(room_body)
     root.add_child(room_card)
     var stations := [
@@ -296,7 +302,13 @@ func _show_puzzle_room(push := true) -> void:
         var button := _button(("✓ " if done else "") + str(station[0]) + "\n" + str(station[1]), func(): _start_room_challenge(kind), not done)
         button.disabled = done
         root.add_child(button)
-    root.add_child(_label("المكتمل: %d / 4     ⭐ %d     🪙 %d" % [room_completed.size(), stars, coins], 17, GOLD))
+    var completed_count := 0
+    for station_kind in ["code", "sequence", "memory", "riddle"]:
+        if bool(room_completed.get(station_kind, false)):
+            completed_count += 1
+    root.add_child(_label("تقدم فتح القاعة: %d / 4     ⭐ %d     🪙 %d" % [completed_count, stars, coins], 17, GOLD))
+    var treasure_note := "🎁 صندوق الكنز أصبح مفتوحاً!" if completed_count == 4 else "🔒 أكمل المحطات الأربع لفتح صندوق الكنز."
+    root.add_child(_label(treasure_note, 18, GOLD))
     root.add_child(_button("خريطة المراحل التقليدية", func(): _show_levels("logic"), false))
     root.add_child(_button("العودة للعوالم", _show_worlds))
 
@@ -725,3 +737,82 @@ class ScreenBackdrop:
         for i in range(8):
             var x := size.x * (0.08 + float(i) * 0.12)
             draw_circle(Vector2(x, size.y * 0.08), 2.0 + float(i % 3), Color(0.95, 0.76, 0.35, 0.35))
+
+
+class RoomHallVisual:
+    extends Control
+
+    func _ready() -> void:
+        mouse_filter = Control.MOUSE_FILTER_IGNORE
+        queue_redraw()
+
+    func _notification(what: int) -> void:
+        if what == NOTIFICATION_RESIZED:
+            queue_redraw()
+
+    func _draw() -> void:
+        var w := size.x
+        var h := size.y
+        if w < 10.0 or h < 10.0:
+            return
+        # أرضية القاعة وجدرانها
+        draw_rect(Rect2(Vector2.ZERO, size), Color("#081326"), true)
+        draw_colored_polygon(PackedVector2Array([
+            Vector2(w * 0.08, h * 0.10), Vector2(w * 0.92, h * 0.10),
+            Vector2(w * 0.78, h * 0.72), Vector2(w * 0.22, h * 0.72)
+        ]), Color("#17375a"))
+        draw_colored_polygon(PackedVector2Array([
+            Vector2(0, h * 0.12), Vector2(w * 0.08, h * 0.10),
+            Vector2(w * 0.22, h * 0.72), Vector2(0, h)
+        ]), Color("#102744"))
+        draw_colored_polygon(PackedVector2Array([
+            Vector2(w, h * 0.12), Vector2(w * 0.92, h * 0.10),
+            Vector2(w * 0.78, h * 0.72), Vector2(w, h)
+        ]), Color("#102744"))
+        draw_colored_polygon(PackedVector2Array([
+            Vector2(0, h), Vector2(w, h), Vector2(w * 0.78, h * 0.72),
+            Vector2(w * 0.22, h * 0.72)
+        ]), Color("#142b45"))
+        # خطوط بلاط المنظور
+        for i in range(1, 5):
+            var t := float(i) / 5.0
+            var y := lerpf(h * 0.73, h * 0.98, t)
+            draw_line(Vector2(w * (0.22 - t * 0.18), y), Vector2(w * (0.78 + t * 0.18), y), Color("#34506a"), 1.2)
+        for i in range(1, 7):
+            var x := float(i) / 7.0
+            draw_line(Vector2(w * 0.5, h * 0.72), Vector2(w * x, h), Color("#34506a"), 1.0)
+        # بوابة الكنز في منتصف الجدار الخلفي
+        draw_rect(Rect2(w * 0.39, h * 0.20, w * 0.22, h * 0.48), Color("#07101e"), true)
+        draw_rect(Rect2(w * 0.415, h * 0.24, w * 0.17, h * 0.44), Color("#6d4828"), true)
+        draw_rect(Rect2(w * 0.435, h * 0.27, w * 0.13, h * 0.41), Color("#18283a"), true)
+        draw_arc(Vector2(w * 0.50, h * 0.30), w * 0.065, PI, TAU, 32, Color("#d6a64c"), 4.0)
+        draw_circle(Vector2(w * 0.545, h * 0.49), 4.0, Color("#f5cb69"))
+        # أعمدة جانبية
+        for side in [0.16, 0.84]:
+            draw_rect(Rect2(w * (side - 0.025), h * 0.20, w * 0.05, h * 0.53), Color("#274866"), true)
+            draw_rect(Rect2(w * (side - 0.04), h * 0.19, w * 0.08, h * 0.035), Color("#bd9652"), true)
+            draw_rect(Rect2(w * (side - 0.04), h * 0.70, w * 0.08, h * 0.035), Color("#bd9652"), true)
+        # مشاعل مضيئة
+        for x in [w * 0.27, w * 0.73]:
+            draw_line(Vector2(x, h * 0.35), Vector2(x, h * 0.47), Color("#9a7542"), 5.0)
+            draw_circle(Vector2(x, h * 0.32), 13.0, Color(1.0, 0.60, 0.18, 0.13))
+            draw_circle(Vector2(x, h * 0.32), 6.0, Color("#ffc65c"))
+            draw_circle(Vector2(x - 2.0, h * 0.315), 2.0, Color("#fff0b0"))
+        # أربع منصات ألغاز في مقدمة القاعة
+        var centers := [Vector2(w * 0.19, h * 0.77), Vector2(w * 0.39, h * 0.84), Vector2(w * 0.61, h * 0.84), Vector2(w * 0.81, h * 0.77)]
+        var symbols := ["9", "?", "◆", "✦"]
+        for i in range(centers.size()):
+            var p: Vector2 = centers[i]
+            draw_colored_polygon(PackedVector2Array([
+                p + Vector2(-w * 0.075, 0), p + Vector2(-w * 0.055, -h * 0.075),
+                p + Vector2(w * 0.055, -h * 0.075), p + Vector2(w * 0.075, 0)
+            ]), Color("#254a6a"))
+            draw_rect(Rect2(p.x - w * 0.052, p.y - h * 0.075, w * 0.104, h * 0.035), Color("#c49a4e"), true)
+            draw_circle(p + Vector2(0, -h * 0.045), minf(w * 0.025, 12.0), Color("#0a1b30"))
+            draw_string(ThemeDB.fallback_font, p + Vector2(-8, -h * 0.035), symbols[i], HORIZONTAL_ALIGNMENT_CENTER, 16, 15, Color("#ffdc83"))
+        # صندوق الكنز في المقدمة
+        var chest := Rect2(w * 0.43, h * 0.89, w * 0.14, h * 0.075)
+        draw_rect(chest, Color("#9b642d"), true)
+        draw_rect(Rect2(chest.position.x, chest.position.y, chest.size.x, chest.size.y * 0.30), Color("#d3a14d"), true)
+        draw_rect(Rect2(w * 0.485, h * 0.90, w * 0.03, h * 0.05), Color("#f5d16f"), true)
+        draw_rect(Rect2(2, 2, w - 4, h - 4), Color("#d3ad65"), false, 2.0)
