@@ -276,6 +276,7 @@ func _show_puzzle_room(push := true) -> void:
     explore_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     explore_view.evidence_state = room_evidence.duplicate(true)
     explore_view.completed_state = room_completed.duplicate(true)
+    explore_view.chest_open = _room_evidence_count() == 4 and _room_completed_count() == 4
     explore_view.object_interacted.connect(_on_room_object_interacted)
     root.add_child(explore_view)
     root.add_child(_label("🕹️ المس مكاناً فارغاً للمشي. اقترب من المشعل أو الرقعة أو المرآة أو الحارس ثم المسه لفحصه.", 15, GOLD))
@@ -311,7 +312,7 @@ func _on_room_object_interacted(object_id: String) -> void:
         "guardian": ["clue_riddle", "الحارس يهمس: ما الذي يكبر كلما أزلت منه؟"]
     }
     if object_id == "chest":
-        if _room_evidence_count() == 4 and room_completed.size() >= 4:
+        if _room_evidence_count() == 4 and _room_completed_count() == 4:
             _clear()
             _header("كنز قاعة الأسرار")
             root.add_child(_label("🏆", 72, GOLD))
@@ -326,6 +327,13 @@ func _on_room_object_interacted(object_id: String) -> void:
     var clue: Array = evidence[object_id]
     _discover_room_evidence(str(clue[0]), str(clue[1]))
 
+func _room_completed_count() -> int:
+    var total := 0
+    for key in ["code", "sequence", "memory", "riddle"]:
+        if bool(room_completed.get(key, false)):
+            total += 1
+    return total
+
 func _room_evidence_count() -> int:
     var total := 0
     for key in ["clue_code", "clue_sequence", "clue_memory", "clue_riddle"]:
@@ -335,14 +343,18 @@ func _room_evidence_count() -> int:
 
 func _discover_room_evidence(clue_id: String, description: String) -> void:
     if bool(room_evidence.get(clue_id, false)):
+        _show_message("هذا الدليل محفوظ لديك بالفعل.")
         return
     room_evidence[clue_id] = true
     _save_progress()
     _clear()
     _header("اكتشاف دليل")
+    var reward_fx := RoomRewardVisual.new()
+    reward_fx.custom_minimum_size = Vector2(0, 150)
+    root.add_child(reward_fx)
     root.add_child(_label("✨ عثرت على دليل مخفي!", 30, GOLD))
     root.add_child(_label(description, 22, CREAM))
-    root.add_child(_label("تم حفظ هذا الدليل، ويمكنك العودة إليه من سجل الأدلة.", 16, MUTED))
+    root.add_child(_label("أُضيف الدليل إلى سجل استكشافك وحُفظ تقدمك.", 16, MUTED))
     root.add_child(_button("متابعة الاستكشاف", _show_puzzle_room, true))
 
 func _start_room_challenge(kind: String) -> void:
@@ -864,10 +876,17 @@ class RoomExploreView:
 
     var evidence_state: Dictionary = {}
     var completed_state: Dictionary = {}
+    var chest_open := false
     var player := Vector2(0.50, 0.84)
     var destination := Vector2(0.50, 0.84)
+    var pending_object := ""
     var move_speed := 0.72
+    var walk_time := 0.0
+    var facing := 1.0
     var hint_text := "المس الأرض للتحرك"
+    var effect_timer := 0.0
+    var effect_position := Vector2(0.5, 0.5)
+    var effect_color := Color("#ffd36a")
 
     const OBJECTS := {
         "torch": Vector2(0.17, 0.43),
@@ -885,8 +904,29 @@ class RoomExploreView:
     func _process(delta: float) -> void:
         var difference := destination - player
         if difference.length() > 0.006:
+            facing = signf(difference.x) if absf(difference.x) > 0.01 else facing
             player = player.move_toward(destination, move_speed * delta)
-            queue_redraw()
+            walk_time += delta * 10.0
+            if pending_object != "" and player.distance_to(_approach_point(pending_object)) <= 0.035:
+                var reached := pending_object
+                pending_object = ""
+                hint_text = "وصلت إلى المكان، يجري فحصه..."
+                _trigger_interaction(reached)
+        else:
+            walk_time = move_toward(walk_time, 0.0, delta * 8.0)
+        if effect_timer > 0.0:
+            effect_timer = maxf(0.0, effect_timer - delta)
+        queue_redraw()
+
+    func _approach_point(object_id: String) -> Vector2:
+        var target: Vector2 = OBJECTS[object_id]
+        return Vector2(target.x, minf(target.y + 0.13, 0.91))
+
+    func _trigger_interaction(object_id: String) -> void:
+        effect_position = OBJECTS[object_id]
+        effect_color = Color("#ffd36a") if object_id != "chest" else Color("#ffe28a")
+        effect_timer = 0.9
+        object_interacted.emit(object_id)
 
     func _gui_input(event: InputEvent) -> void:
         var point := Vector2(-1, -1)
@@ -908,14 +948,16 @@ class RoomExploreView:
                 nearest_id = str(object_id)
                 nearest_distance = distance
         if nearest_id != "":
-            var target: Vector2 = OBJECTS[nearest_id]
-            if player.distance_to(target) <= 0.145:
+            if player.distance_to(OBJECTS[nearest_id]) <= 0.155:
+                pending_object = ""
+                _trigger_interaction(nearest_id)
                 hint_text = "تفحص المكان..."
-                object_interacted.emit(nearest_id)
             else:
-                destination = Vector2(target.x, minf(target.y + 0.13, 0.91))
-                hint_text = "أنت في طريقك إلى المكان... المسه عند الاقتراب"
+                pending_object = nearest_id
+                destination = _approach_point(nearest_id)
+                hint_text = "يتجه المستكشف إلى الأثر..."
         else:
+            pending_object = ""
             destination = local
             hint_text = "تحرّك نحو الأثر ثم المسه لفحصه"
         queue_redraw()
@@ -959,24 +1001,83 @@ class RoomExploreView:
         _draw_object("mirror", "🪞", "المرآة", w, h)
         _draw_object("guardian", "🗿", "الحارس", w, h)
         _draw_object("chest", "🎁", "الصندوق", w, h)
-        var px := player.x * w
-        var py := player.y * h
-        draw_circle(Vector2(px, py + 7), 12, Color(0, 0, 0, 0.35))
-        draw_circle(Vector2(px, py - 5), 11, Color("#f2bd4b"))
-        draw_circle(Vector2(px, py - 5), 7, Color("#17375a"))
-        draw_arc(Vector2(px, py - 5), 15, 0, TAU, 24, Color("#fff1cf"), 2.0)
+        _draw_player(w, h)
+        if effect_timer > 0.0:
+            _draw_sparkles(effect_position * Vector2(w, h), effect_timer)
         draw_string(ThemeDB.fallback_font, Vector2(12, 23), hint_text, HORIZONTAL_ALIGNMENT_LEFT, w - 24, 14, Color("#fff1cf"))
         draw_rect(Rect2(2, 2, w - 4, h - 4), Color("#d3ad65"), false, 2.0)
+
+    func _draw_player(w: float, h: float) -> void:
+        var bob := sin(walk_time) * 3.0 if absf(destination.distance_to(player)) > 0.006 else sin(Time.get_ticks_msec() / 360.0) * 1.2
+        var center := Vector2(player.x * w, player.y * h + bob)
+        var swing := sin(walk_time) * 8.0
+        var skin := Color("#f0bd8c")
+        var coat := Color("#d49a3d")
+        draw_ellipse(center + Vector2(0, 16), Vector2(13, 5), Color(0, 0, 0, 0.35))
+        draw_line(center + Vector2(-4, 8), center + Vector2(-6 + swing * 0.45, 23), Color("#263b58"), 5.0)
+        draw_line(center + Vector2(4, 8), center + Vector2(6 - swing * 0.45, 23), Color("#263b58"), 5.0)
+        draw_line(center + Vector2(-5, -2), center + Vector2(-10 - swing * 0.55, 9), skin, 4.0)
+        draw_line(center + Vector2(5, -2), center + Vector2(10 + swing * 0.55, 9), skin, 4.0)
+        draw_colored_polygon(PackedVector2Array([
+            center + Vector2(-8, -7), center + Vector2(8, -7),
+            center + Vector2(7, 10), center + Vector2(-7, 10)
+        ]), coat)
+        draw_circle(center + Vector2(0, -15), 7, skin)
+        draw_arc(center + Vector2(0, -15), 7, PI, TAU, 16, Color("#4b3028"), 3.0)
+        var eye_x := 2.5 * facing
+        draw_circle(center + Vector2(eye_x, -16), 1.1, Color("#17243a"))
+
+    func _draw_sparkles(center: Vector2, remaining: float) -> void:
+        var progress := 1.0 - remaining / 0.9
+        for i in range(10):
+            var angle := TAU * float(i) / 10.0
+            var radius := 12.0 + progress * 30.0
+            var p := center + Vector2(cos(angle), sin(angle)) * radius
+            var alpha := clampf(remaining / 0.9, 0.0, 1.0)
+            draw_circle(p, 2.0 + alpha * 1.5, Color(effect_color.r, effect_color.g, effect_color.b, alpha))
 
     func _draw_object(object_id: String, symbol: String, caption: String, w: float, h: float) -> void:
         var p: Vector2 = OBJECTS[object_id]
         var center := Vector2(p.x * w, p.y * h)
-        var found := bool(evidence_state.get("clue_" + {"torch":"code", "scroll":"sequence", "mirror":"memory", "guardian":"riddle"}.get(object_id, ""), false))
-        var done := bool(completed_state.get({"torch":"code", "scroll":"sequence", "mirror":"memory", "guardian":"riddle"}.get(object_id, ""), false))
+        var clue_key := str({"torch":"clue_code", "scroll":"clue_sequence", "mirror":"clue_memory", "guardian":"clue_riddle"}.get(object_id, ""))
+        var station_key := str({"torch":"code", "scroll":"sequence", "mirror":"memory", "guardian":"riddle"}.get(object_id, ""))
+        var found := bool(evidence_state.get(clue_key, false))
+        var done := bool(completed_state.get(station_key, false))
         var glow := Color("#39b879") if found or done else Color("#f2bd4b")
         draw_circle(center, 24, Color(glow.r, glow.g, glow.b, 0.18))
         draw_circle(center, 17, Color("#10294b"))
         draw_arc(center, 19, 0, TAU, 28, glow, 2.0)
         draw_string(ThemeDB.fallback_font, center + Vector2(-12, 6), symbol, HORIZONTAL_ALIGNMENT_LEFT, 28, 19, Color("#fff1cf"))
         draw_string(ThemeDB.fallback_font, center + Vector2(-35, 37), caption + (" ✓" if found or done else ""), HORIZONTAL_ALIGNMENT_CENTER, 70, 12, Color("#fff1cf"))
+        if object_id == "chest":
+            if chest_open:
+                draw_rect(Rect2(center.x - 18, center.y - 2, 36, 15), Color("#b87932"), true)
+                draw_colored_polygon(PackedVector2Array([center + Vector2(-18, -7), center + Vector2(-13, -20), center + Vector2(18, -20), center + Vector2(18, -7)]), Color("#e5b653"))
+                draw_circle(center + Vector2(0, -13), 22, Color(1.0, 0.78, 0.25, 0.15))
+            else:
+                draw_rect(Rect2(center.x - 18, center.y - 8, 36, 20), Color("#9b642d"), true)
+                draw_rect(Rect2(center.x - 18, center.y - 8, 36, 7), Color("#d3a14d"), true)
+
+class RoomRewardVisual:
+    extends Control
+
+    var elapsed := 0.0
+
+    func _ready() -> void:
+        set_process(true)
+        queue_redraw()
+
+    func _process(delta: float) -> void:
+        elapsed += delta
+        queue_redraw()
+
+    func _draw() -> void:
+        var center := size * 0.5
+        draw_circle(center, 42.0 + sin(elapsed * 3.0) * 5.0, Color(1.0, 0.76, 0.25, 0.10))
+        for i in range(16):
+            var angle := TAU * float(i) / 16.0 + elapsed * 0.45
+            var radius := 18.0 + fposmod(elapsed * 28.0 + float(i) * 7.0, 48.0)
+            var point := center + Vector2(cos(angle), sin(angle)) * radius
+            var alpha := 0.45 + 0.45 * absf(sin(elapsed * 2.0 + float(i)))
+            draw_circle(point, 2.0 + absf(sin(elapsed + float(i))) * 2.0, Color(1.0, 0.82, 0.42, alpha))
 
