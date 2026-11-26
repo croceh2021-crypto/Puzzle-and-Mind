@@ -333,7 +333,7 @@ func _show_room_challenge() -> void:
             root.add_child(_label("تذكّر الترتيب التالي ثم اضغط الرموز بالترتيب نفسه:", 18))
             root.add_child(_label("🌙  ⭐  🔑", 38, GOLD))
             root.add_child(_label("اختيارك: %d / 3" % room_sequence_progress, 19, MUTED))
-            for symbol in ["⭐", "🔑", "🌙"]:
+            for symbol in ["🌙", "⭐", "🔑"]:
                 root.add_child(_button(symbol, func(): _room_memory_pick(symbol)))
         "riddle":
             root.add_child(_label("📜 لغز الحارس", 27, GOLD))
