@@ -323,7 +323,7 @@ func _on_room_object_interacted(object_id: String) -> void:
             _save_progress()
             _clear()
             _header("كنز قاعة الأسرار")
-            var portal_fx := TemplePortalVisual.new()
+            var portal_fx := RoomRewardVisual.new()
             portal_fx.custom_minimum_size = Vector2(0, 190)
             root.add_child(portal_fx)
             root.add_child(_label("🏆 لقد فتحت صندوق الكنز!", 28, GOLD))
@@ -365,42 +365,88 @@ func _temple_relic_count() -> int:
     return total
 
 func _on_temple_object_interacted(object_id: String) -> void:
-    var relics := {
-        "sun": "ختم الشمس: يرمز إلى بداية النهار والنور.",
-        "moon": "ختم القمر: لا يظهر نوره إلا في الظلام.",
-        "eye": "ختم العين: يراقب الطريق إلى قلب المعبد."
-    }
     if object_id == "gate":
         if _temple_relic_count() == 3:
             temple_completed = true
             _save_progress()
             _clear()
             _header("بوابة المعبد")
-            var portal_fx := TemplePortalVisual.new()
+            var portal_fx := RoomRewardVisual.new()
             portal_fx.custom_minimum_size = Vector2(0, 210)
             root.add_child(portal_fx)
             root.add_child(_label("🌟 لقد فتحت بوابة المعبد القديم!", 27, GOLD))
-            root.add_child(_label("جمعت الأختام الثلاثة وأيقظت البوابة. لقد أصبحت المنطقة الثانية مكتملة!", 19))
+            root.add_child(_label("حللت ألغاز الأختام الثلاثة وأيقظت البوابة. المنطقة الثانية مكتملة!", 19))
             root.add_child(_button("العودة إلى المعبد", _show_temple_room, true))
         else:
-            _show_message("البوابة لا تستجيب. ابحث عن أختام الشمس والقمر والعين الثلاثة.")
+            _show_message("البوابة لا تستجيب. حل ألغاز أختام الشمس والقمر والعين أولاً.")
         return
-    if not relics.has(object_id):
+    if not ["sun", "moon", "eye"].has(object_id):
         return
     if bool(temple_relics.get(object_id, false)):
         _show_message("هذا الختم محفوظ في سجل مغامرتك.")
         return
-    temple_relics[object_id] = true
+    _show_temple_trial(object_id)
+
+func _show_temple_trial(relic_id: String) -> void:
+    _clear()
+    var title := ""
+    var question := ""
+    var options: Array[String] = []
+    match relic_id:
+        "sun":
+            title = "لغز ختم الشمس"
+            question = "تزداد الأعداد بمقدار 2:  2 ، 4 ، 6 ، ؟"
+            options = ["7", "8", "9"]
+        "moon":
+            title = "لغز ختم القمر"
+            question = "أي ترتيب يمثل تعاقب الليل ثم النهار ثم الليل؟"
+            options = ["☾  ☀  ☾", "☀  ☀  ☾", "☾  ☾  ☀"]
+        "eye":
+            title = "لغز ختم العين"
+            question = "شيء له عين واحدة ولا يرى، ما هو؟"
+            options = ["المرآة", "الإبرة", "المصباح"]
+    _header(title)
+    root.add_child(_label("أجب إجابة صحيحة لتفعيل الختم الأثري.", 16, MUTED))
+    root.add_child(_label(question, 23, GOLD))
+    for option in options:
+        var answer := option
+        root.add_child(_button(answer, func(): _answer_temple_trial(relic_id, answer), true))
+    root.add_child(_button("العودة إلى المعبد", _show_temple_room, false))
+
+func _answer_temple_trial(relic_id: String, answer: String) -> void:
+    var correct := ""
+    var description := ""
+    match relic_id:
+        "sun":
+            correct = "8"
+            description = "ختم الشمس: اكتشفت أن النمط يزداد بمقدار اثنين."
+        "moon":
+            correct = "☾  ☀  ☾"
+            description = "ختم القمر: عرفت ترتيب الليل والنهار."
+        "eye":
+            correct = "الإبرة"
+            description = "ختم العين: عرفت أن عين الإبرة لا ترى."
+    if answer != correct:
+        _show_temple_trial_feedback(relic_id, false)
+        return
+    temple_relics[relic_id] = true
     _save_progress()
     _clear()
-    _header("اكتشاف ختم أثري")
+    _header("تفعيل الختم")
     var fx := RoomRewardVisual.new()
     fx.custom_minimum_size = Vector2(0, 150)
     root.add_child(fx)
-    root.add_child(_label("✨ اكتشفت ختماً جديداً!", 28, GOLD))
-    root.add_child(_label(relics[object_id], 20))
-    root.add_child(_label("حُفظ تقدمك ويمكنك متابعة الاستكشاف.", 16, MUTED))
-    root.add_child(_button("متابعة المعبد", _show_temple_room, true))
+    root.add_child(_label("✨ إجابة صحيحة! اكتسبت الختم.", 27, GOLD))
+    root.add_child(_label(description, 20))
+    root.add_child(_label("الأختام المكتشفة: %d / 3" % _temple_relic_count(), 17, MUTED))
+    root.add_child(_button("متابعة استكشاف المعبد", _show_temple_room, true))
+
+func _show_temple_trial_feedback(relic_id: String, _unused: bool) -> void:
+    _clear()
+    _header("حاول مرة أخرى")
+    root.add_child(_label("ليست هذه الإجابة الصحيحة. فكّر في اللغز وحاول مجدداً.", 21, GOLD))
+    root.add_child(_button("إعادة المحاولة", func(): _show_temple_trial(relic_id), true))
+    root.add_child(_button("العودة إلى المعبد", _show_temple_room, false))
 
 func _room_completed_count() -> int:
     var total := 0
