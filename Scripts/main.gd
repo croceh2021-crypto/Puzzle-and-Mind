@@ -1013,7 +1013,7 @@ class RoomExploreView:
         var swing := sin(walk_time) * 8.0
         var skin := Color("#f0bd8c")
         var coat := Color("#d49a3d")
-        draw_ellipse(center + Vector2(0, 16), Vector2(13, 5), Color(0, 0, 0, 0.35))
+        draw_circle(center + Vector2(0, 16), 8, Color(0, 0, 0, 0.35))
         draw_line(center + Vector2(-4, 8), center + Vector2(-6 + swing * 0.45, 23), Color("#263b58"), 5.0)
         draw_line(center + Vector2(4, 8), center + Vector2(6 - swing * 0.45, 23), Color("#263b58"), 5.0)
         draw_line(center + Vector2(-5, -2), center + Vector2(-10 - swing * 0.55, 9), skin, 4.0)
